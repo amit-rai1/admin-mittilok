@@ -1,80 +1,73 @@
-import { useEffect, useState } from "react";
-import { BarChart3, Boxes, CalendarDays, ChevronDown, CircleHelp, FolderTree, LayoutDashboard, Leaf, LogOut, Menu, PackageSearch, Search, Settings, ShoppingBag, Users, X } from "lucide-react";
-import "./style.css";
+import type { ReactNode } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { useAuth } from "./context/AuthContext";
+import { LoginPage } from "./pages/Login";
+import { DashboardPage } from "./pages/Dashboard";
+import { CategoriesPage } from "./pages/categories/CategoriesPage";
+import { SubcategoriesPage } from "./pages/subcategories/SubcategoriesPage";
+import { ProductsPage } from "./pages/products/ProductsPage";
+import { ProductFormPage } from "./pages/products/ProductFormPage";
+import { OrdersPage } from "./pages/orders/OrdersPage";
+import { OrderDetailPage } from "./pages/orders/OrderDetailPage";
+import { ReturnsPage } from "./pages/orders/ReturnsPage";
+import { CustomersPage } from "./pages/customers/CustomersPage";
+import { ServicesPage } from "./pages/services/ServicesPage";
+import { BookingsPage } from "./pages/services/BookingsPage";
+import { EnquiriesPage } from "./pages/services/EnquiriesPage";
+import { PodcastBookingsPage } from "./pages/podcast/PodcastBookingsPage";
+import { CouponsPage } from "./pages/marketing/CouponsPage";
+import { BannersPage } from "./pages/marketing/BannersPage";
+import { HomepagePage } from "./pages/content/HomepagePage";
+import { ReviewsPage } from "./pages/reviews/ReviewsPage";
+import { InventoryPage } from "./pages/inventory/InventoryPage";
+import { ReportsPage } from "./pages/reports/ReportsPage";
+import { SettingsPage } from "./pages/settings/SettingsPage";
+import { NotificationsPage } from "./pages/notifications/NotificationsPage";
 
-type Category = { _id: string; name: string; type: string; image?: string; subCategories?: Array<{ _id: string; name: string; image?: string }> };
-type Product = { _id: string; name: string; sku: string; price: number; stock: number; status: string };
-type Service = { _id: string; name: string; price?: number; priceType: string; status: string };
-type Booking = { _id: string; bookingNumber: string; name: string; phone: string; status: string; preferredDate: string };
-type Order = { _id: string; orderNumber: string; total?: number; orderStatus: string; paymentStatus: string };
-type Customer = { _id: string; fullName: string; phone: string; email?: string; role: string; status: string };
-type Podcast = { _id: string; name: string; phone: string; topic?: string; status: string };
-const API = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api";
-
-async function api<T>(path: string, options: RequestInit = {}) {
-  const response = await fetch(`${API}${path}`, { ...options, headers: { "Content-Type": "application/json", ...(localStorage.getItem("mittilok-token") ? { Authorization: `Bearer ${localStorage.getItem("mittilok-token")}` } : {}) } });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message ?? "Request failed");
-  return data as T;
+function Protected({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="boot-screen">Checking session…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
 }
 
-async function uploadImage(file: File) {
-  const form = new FormData(); form.append("image", file);
-  const response = await fetch(`${API}/uploads/image`, { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("mittilok-token")}` }, body: form });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message ?? "Image upload failed");
-  return data.url as string;
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <Protected>
+            <Layout />
+          </Protected>
+        }
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="subcategories" element={<SubcategoriesPage />} />
+        <Route path="products" element={<ProductsPage />} />
+        <Route path="products/new" element={<ProductFormPage />} />
+        <Route path="products/:id" element={<ProductFormPage />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="orders/returns" element={<ReturnsPage />} />
+        <Route path="orders/:id" element={<OrderDetailPage />} />
+        <Route path="customers" element={<CustomersPage />} />
+        <Route path="services" element={<ServicesPage />} />
+        <Route path="services/bookings" element={<BookingsPage />} />
+        <Route path="services/enquiries" element={<EnquiriesPage />} />
+        <Route path="podcast/bookings" element={<PodcastBookingsPage />} />
+        <Route path="marketing/coupons" element={<CouponsPage />} />
+        <Route path="marketing/banners" element={<BannersPage />} />
+        <Route path="content/homepage" element={<HomepagePage />} />
+        <Route path="reviews" element={<ReviewsPage />} />
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
-
-function Login({ onLogin }: { onLogin: () => void }) {
-  const [phone, setPhone] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState("");
-  return <main className="login-page"><div className="login-art"><div className="brand"><span><Leaf size={20} /></span><strong>MittiLok</strong></div><div><p className="kicker">Operations console</p><h1>Grow the business<br /><em>behind the garden.</em></h1><p>One quiet place for products, services, bookings, customers, and the daily work that keeps MittiLok moving.</p></div><small>© 2026 MittiLok Nursery</small></div><form className="login-card" onSubmit={async (event) => { event.preventDefault(); setError(""); try { const result = await api<{ token: string }>("/auth/login", { method: "POST", body: JSON.stringify({ phone, password }) }); localStorage.setItem("mittilok-token", result.token); onLogin(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to sign in"); } }}><p className="kicker">Admin sign in</p><h2>Welcome back</h2><p className="muted">Use your administrator credentials to continue.</p><label>Phone number<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="9999999999" required /></label><label>Password<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="••••••••" required /></label>{error && <p className="error">{error}</p>}<button className="primary-button">Enter dashboard <span>→</span></button><p className="login-hint">Admin access is controlled by the backend role.</p></form></main>;
-}
-
-function App() {
-  const [authenticated, setAuthenticated] = useState(Boolean(localStorage.getItem("mittilok-token")));
-  return authenticated ? <Dashboard onLogout={() => { localStorage.removeItem("mittilok-token"); setAuthenticated(false); }} /> : <Login onLogin={() => setAuthenticated(true)} />;
-}
-
-function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [menuOpen, setMenuOpen] = useState(false); const [active, setActive] = useState("Overview"); const [categories, setCategories] = useState<Category[]>([]); const [products, setProducts] = useState<Product[]>([]); const [services, setServices] = useState<Service[]>([]); const [bookings, setBookings] = useState<Booking[]>([]); const [orders, setOrders] = useState<Order[]>([]); const [customers, setCustomers] = useState<Customer[]>([]); const [podcasts, setPodcasts] = useState<Podcast[]>([]); const [error, setError] = useState("");
-  useEffect(() => { Promise.all([api<{ categories: Category[] }>("/categories/admin"), api<Product[]>("/products/admin/all"), api<Service[]>("/services/admin/all"), api<Booking[]>("/bookings"), api<Order[]>("/orders"), api<Customer[]>("/users"), api<Podcast[]>("/podcast")]).then(([categoryData, productData, serviceData, bookingData, orderData, customerData, podcastData]) => { setCategories(categoryData.categories); setProducts(productData); setServices(serviceData); setBookings(bookingData); setOrders(orderData); setCustomers(customerData); setPodcasts(podcastData); }).catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to load dashboard")); }, []);
-  const lowStock = products.filter((item) => item.stock < 12);
-  const nav = [{ label: "Overview", icon: LayoutDashboard }, { label: "Catalog", icon: PackageSearch }, { label: "Categories", icon: FolderTree }, { label: "Bookings", icon: CalendarDays }, { label: "Orders", icon: ShoppingBag }, { label: "Customers", icon: Users }, { label: "Podcast", icon: CircleHelp }, { label: "Settings", icon: Settings }];
-  return <div className="app-shell"><aside className={menuOpen ? "sidebar open" : "sidebar"}><div className="sidebar-brand"><span><Leaf size={18} /></span><strong>MittiLok</strong><button onClick={() => setMenuOpen(false)} className="close-menu"><X size={18} /></button></div><p className="nav-label">Workspace</p><nav>{nav.map(({ label, icon: Icon }) => <button className={active === label ? "nav-item active" : "nav-item"} onClick={() => { setActive(label); setMenuOpen(false); }} key={label}><Icon size={17} />{label}{label === "Bookings" && <b>{bookings.length}</b>}</button>)}</nav><div className="sidebar-foot"><button className="nav-item" onClick={() => setActive("Settings")}><Settings size={17} />Settings</button><button className="nav-item" onClick={onLogout}><LogOut size={17} />Sign out</button><div className="admin-user"><div className="avatar">ML</div><span><strong>Admin</strong><small>Super administrator</small></span><ChevronDown size={15} /></div></div></aside><main className="content"><header><button className="mobile-menu" onClick={() => setMenuOpen(true)}><Menu /></button><div><p className="kicker">Friday, 28 August 2026</p><h1>{active}</h1></div><div className="header-actions"><button className="help"><CircleHelp size={17} /> Help center</button><div className="header-avatar">ML</div></div></header>{error && <div className="alert">{error}</div>}<div className="content-inner">{active === "Overview" ? <Overview categories={categories} products={products} services={services} lowStock={lowStock} /> : active === "Catalog" ? <CatalogView categories={categories} products={products} services={services} onRefresh={() => window.location.reload()} /> : active === "Categories" ? <CategoriesView categories={categories} onRefresh={() => window.location.reload()} /> : active === "Bookings" ? <RecordsView title="Bookings" bookings={bookings} /> : active === "Orders" ? <RecordsView title="Orders" orders={orders} /> : active === "Customers" ? <CustomersView customers={customers} /> : active === "Podcast" ? <PodcastView podcasts={podcasts} /> : active === "Settings" ? <SettingsView /> : <SectionPlaceholder name={active} categories={categories} products={products} services={services} />}</div></main></div>;
-}
-
-function Overview({ categories, products, services, lowStock }: { categories: Category[]; products: Product[]; services: Service[]; lowStock: Product[] }) {
-  const stats = [{ label: "Catalog products", value: products.length, change: "Live from MongoDB", icon: Boxes, color: "mint" }, { label: "Active services", value: services.length, change: "Across 2 divisions", icon: Leaf, color: "yellow" }, { label: "Business categories", value: categories.length, change: "All departments", icon: FolderTree, color: "blue" }, { label: "Low stock alerts", value: lowStock.length, change: lowStock.length ? "Needs attention" : "All healthy", icon: BarChart3, color: "coral" }];
-  return <><section className="welcome"><div><p className="kicker">Good morning, admin</p><h2>The garden is looking healthy.</h2><p>Here is the pulse of your MittiLok operation today.</p></div><button className="outline-button"><Search size={16} /> Search anything</button></section><section className="stat-grid">{stats.map(({ label, value, change, icon: Icon, color }) => <article className="stat-card" key={label}><div className={`stat-icon ${color}`}><Icon size={20} /></div><p>{label}</p><strong>{value}</strong><small>{change}</small></article>)}</section><div className="dashboard-grid"><section className="panel inventory-panel"><div className="panel-heading"><div><p className="kicker">Inventory watch</p><h3>Stock that needs you</h3></div><button className="text-button">View inventory →</button></div>{lowStock.length ? lowStock.slice(0, 5).map((product) => <div className="inventory-row" key={product._id}><div className="product-thumb"><Leaf size={18} /></div><div className="product-name"><strong>{product.name}</strong><small>{product.sku}</small></div><div className="stock"><strong>{product.stock} units</strong><span className={product.stock < 8 ? "critical" : "warning"}>{product.stock < 8 ? "Critical" : "Low stock"}</span></div></div>) : <div className="empty">No low-stock products right now.</div>}</section><section className="panel category-panel"><div className="panel-heading"><div><p className="kicker">Business structure</p><h3>Categories</h3></div><button className="icon-only">+</button></div>{categories.slice(0, 5).map((category) => <div className="category-row" key={category._id}><span className={`category-dot ${category.type}`}></span><strong>{category.name.replace("MittiLok ", "")}</strong><small>{category.subCategories?.length ?? 0} sub-categories</small></div>)}</section></div><section className="panel activity"><div className="panel-heading"><div><p className="kicker">Operations</p><h3>Today at a glance</h3></div><button className="filter-button">All activity <ChevronDown size={15} /></button></div><div className="activity-list"><div><span className="activity-icon mint"><PackageSearch size={16} /></span><p><strong>Catalog is connected</strong><small>{products.length} products are available to manage from the API</small></p><time>Now</time></div><div><span className="activity-icon yellow"><CalendarDays size={16} /></span><p><strong>Booking workflow ready</strong><small>Customer service requests will appear here</small></p><time>Ready</time></div></div></section></>;
-}
-
-function CatalogView({ categories, products, services, onRefresh }: { categories: Category[]; products: Product[]; services: Service[]; onRefresh: () => void }) {
-  const [tab, setTab] = useState<"products" | "services">("products");
-  const [formOpen, setFormOpen] = useState(false);
-  const [error, setError] = useState("");
-  async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); try { const image = data.imageFile instanceof File && data.imageFile.size ? await uploadImage(data.imageFile) : String(data.imageUrl || ""); await api(tab === "products" ? "/products/admin" : "/services/admin", { method: "POST", body: JSON.stringify(tab === "products" ? { ...data, price: Number(data.price), stock: Number(data.stock), categoryId: data.categoryId, images: image ? [{ url: image }] : [] } : { ...data, price: Number(data.price || 0), categoryId: data.categoryId, coverImage: image }) }); setFormOpen(false); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to create record"); } }
-  async function remove(id: string) { if (!window.confirm("Disable this record?")) return; try { await api(`${tab === "products" ? "/products/admin/" : "/services/admin/"}${id}`, { method: "DELETE" }); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to update record"); } }
-  return <><div className="page-toolbar"><div><p className="kicker">Live catalog</p><h2>Products & services</h2><p className="muted">Create and review the records your customer website uses.</p></div><button className="primary-button" onClick={() => setFormOpen(true)}>+ Add {tab === "products" ? "product" : "service"}</button></div><div className="switcher"><button className={tab === "products" ? "selected" : ""} onClick={() => setTab("products")}>Products <b>{products.length}</b></button><button className={tab === "services" ? "selected" : ""} onClick={() => setTab("services")}>Services <b>{services.length}</b></button></div>{error && <div className="alert">{error}</div>}{tab === "products" ? <div className="data-table panel"><div className="table-head"><span>Product</span><span>SKU</span><span>Price</span><span>Stock</span><span>Action</span></div>{products.map((item) => <div className="table-row" key={item._id}><strong>{item.name}</strong><span>{item.sku}</span><span>Rs {item.price}</span><span className={item.stock < 12 ? "critical" : ""}>{item.stock}</span><button className="row-action" onClick={() => remove(item._id)}>Disable</button></div>)}</div> : <div className="data-table panel"><div className="table-head"><span>Service</span><span>Price</span><span>Price type</span><span>Action</span></div>{services.map((item) => <div className="table-row" key={item._id}><strong>{item.name}</strong><span>{item.price ? `Rs ${item.price}` : "Quote"}</span><span>{item.priceType}</span><button className="row-action" onClick={() => remove(item._id)}>Disable</button></div>)}</div>}{formOpen && <div className="modal-backdrop"><form className="modal panel" onSubmit={submit}><div className="panel-heading"><div><p className="kicker">New record</p><h3>Add {tab === "products" ? "product" : "service"}</h3></div><button type="button" className="icon-only" onClick={() => setFormOpen(false)}>×</button></div><label>Name<input name="name" required placeholder={tab === "products" ? "Snake Plant" : "Garden Maintenance"} /></label><label>Slug<input name="slug" required placeholder="url-friendly-name" /></label><label>Category<select name="categoryId" required defaultValue=""><option value="" disabled>Select a category</option>{categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}</select></label><label>Image URL<input name="imageUrl" type="url" placeholder="https://..." /></label><label>Or upload image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" /></label>{tab === "products" ? <><label>SKU<input name="sku" required placeholder="ML-SNAKE-01" /></label><div className="form-two"><label>Price<input name="price" type="number" min="0" required /></label><label>Stock<input name="stock" type="number" min="0" required /></label></div></> : <><label>Price<input name="price" type="number" min="0" /></label><label>Price type<select name="priceType" defaultValue="custom-quote"><option value="fixed">Fixed</option><option value="starting-from">Starting from</option><option value="contact">Contact for price</option><option value="custom-quote">Custom quote</option></select></label></>}<button className="primary-button">Create record</button></form></div>}</>;
-}
-
-function CategoriesView({ categories, onRefresh }: { categories: Category[]; onRefresh: () => void }) {
-  const [formOpen, setFormOpen] = useState(false); const [subCategoryFor, setSubCategoryFor] = useState<Category | null>(null); const [error, setError] = useState("");
-  async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); try { const image = data.imageFile instanceof File && data.imageFile.size ? await uploadImage(data.imageFile) : String(data.imageUrl || ""); await api("/categories", { method: "POST", body: JSON.stringify({ name: data.name, slug: data.slug, type: data.type, image, sortOrder: 0 }) }); setFormOpen(false); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to create category"); } }
-  async function submitSubCategory(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); try { const image = data.imageFile instanceof File && data.imageFile.size ? await uploadImage(data.imageFile) : String(data.imageUrl || ""); await api("/categories/sub-categories", { method: "POST", body: JSON.stringify({ categoryId: subCategoryFor?._id, name: data.name, slug: data.slug, description: data.description, image, sortOrder: 0 }) }); setSubCategoryFor(null); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to create sub-category"); } }
-  async function removeCategory(id: string) { if (!window.confirm("Delete this category and its sub-categories?")) return; try { await api(`/categories/${id}`, { method: "DELETE" }); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to delete category"); } }
-  async function removeSubCategory(id: string) { if (!window.confirm("Delete this sub-category?")) return; try { await api(`/categories/sub-categories/${id}`, { method: "DELETE" }); onRefresh(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to delete sub-category"); } }
-  return <><div className="page-toolbar"><div><p className="kicker">Business structure</p><h2>Categories</h2><p className="muted">Parent category → sub-category → customer-facing page.</p></div><button className="primary-button" onClick={() => setFormOpen(true)}>+ Add category</button></div>{error && <div className="alert">{error}</div>}<div className="category-management">{categories.map((category) => <article className="panel manage-category" key={category._id}>{category.image && <img className="category-cover" src={category.image} alt="" />}<div className="manage-category-title"><span className={`category-dot ${category.type}`}></span><div><h3>{category.name}</h3><small>{category.type} · active</small></div><button className="icon-only" onClick={() => setSubCategoryFor(category)} title="Add sub-category">+</button><button className="row-action" onClick={() => removeCategory(category._id)}>Delete</button></div><div className="sub-list">{category.subCategories?.map((sub) => <span key={sub._id}>{sub.image && "▣ "}{sub.name}<button className="sub-delete" onClick={() => removeSubCategory(sub._id)} aria-label={`Delete ${sub.name}`}>×</button></span>)}</div><footer>{category.subCategories?.length ?? 0} sub-categories <button className="text-button" onClick={() => setSubCategoryFor(category)}>Add sub-category →</button></footer></article>)}</div>{formOpen && <div className="modal-backdrop"><form className="modal panel" onSubmit={submit}><div className="panel-heading"><div><p className="kicker">New department</p><h3>Add category</h3></div><button type="button" className="icon-only" onClick={() => setFormOpen(false)}>×</button></div><label>Category name<input name="name" required placeholder="MittiLok Consultancy" /></label><label>Slug<input name="slug" required placeholder="consultancy" /></label><label>Type<select name="type" defaultValue="service"><option value="service">Service</option><option value="product">Product</option><option value="podcast">Podcast</option></select></label><label>Image URL<input name="imageUrl" type="url" placeholder="https://..." /></label><label>Or upload image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" /></label><button className="primary-button">Create category</button></form></div>}{subCategoryFor && <div className="modal-backdrop"><form className="modal panel" onSubmit={submitSubCategory}><div className="panel-heading"><div><p className="kicker">Child of {subCategoryFor.name}</p><h3>Add sub-category</h3></div><button type="button" className="icon-only" onClick={() => setSubCategoryFor(null)}>×</button></div><label>Sub-category name<input name="name" required placeholder="Residential Landscaping" /></label><label>Slug<input name="slug" required placeholder="residential-landscaping" /></label><label>Description<input name="description" placeholder="Short customer-facing description" /></label><label>Image URL<input name="imageUrl" type="url" placeholder="https://..." /></label><label>Or upload image<input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" /></label><button className="primary-button">Create sub-category</button></form></div>}</>;
-}
-
-function RecordsView({ title, bookings = [], orders = [] }: { title: string; bookings?: Booking[]; orders?: Order[] }) { const isBooking = title === "Bookings"; return <><div className="page-toolbar"><div><p className="kicker">Live operations</p><h2>{title}</h2><p className="muted">Review and track records submitted by customers.</p></div><button className="outline-button"><Search size={16} /> Search</button></div><div className="data-table panel"><div className="table-head"><span>{isBooking ? "Booking" : "Order"}</span><span>{isBooking ? "Customer" : "Total"}</span><span>{isBooking ? "Date" : "Payment"}</span><span>Status</span></div>{isBooking ? bookings.map((item) => <div className="table-row" key={item._id}><strong>{item.bookingNumber}</strong><span>{item.name}<small>{item.phone}</small></span><span>{new Date(item.preferredDate).toLocaleDateString("en-IN")}</span><span className="status">{item.status}</span></div>) : orders.map((item) => <div className="table-row" key={item._id}><strong>{item.orderNumber}</strong><span>Rs {item.total ?? 0}</span><span>{item.paymentStatus}</span><span className="status">{item.orderStatus}</span></div>)}{!bookings.length && !orders.length && <div className="empty">No {title.toLowerCase()} have been submitted yet.</div>}</div></>; }
-
-function CustomersView({ customers }: { customers: Customer[] }) { return <><div className="page-toolbar"><div><p className="kicker">Customer directory</p><h2>Customers</h2><p className="muted">Registered accounts from the authenticated customer flow.</p></div></div><div className="data-table panel"><div className="table-head"><span>Name</span><span>Phone</span><span>Email</span><span>Status</span></div>{customers.map((item) => <div className="table-row" key={item._id}><strong>{item.fullName}</strong><span>{item.phone}</span><span>{item.email || "Not added"}</span><span className="status">{item.status}</span></div>)}{!customers.length && <div className="empty">No customers found.</div>}</div></>; }
-
-function PodcastView({ podcasts }: { podcasts: Podcast[] }) { return <><div className="page-toolbar"><div><p className="kicker">Podcast requests</p><h2>Podcast</h2><p className="muted">Review requests from customers who want to book the MittiLok podcast.</p></div></div><div className="data-table panel"><div className="table-head"><span>Guest</span><span>Phone</span><span>Topic</span><span>Status</span></div>{podcasts.map((item) => <div className="table-row" key={item._id}><strong>{item.name}</strong><span>{item.phone}</span><span>{item.topic || "Topic not provided"}</span><span className="status">{item.status}</span></div>)}{!podcasts.length && <div className="empty">No podcast requests found.</div>}</div></>; }
-
-function SettingsView() { const [saved, setSaved] = useState(false); const [values, setValues] = useState({ websiteName: "MittiLok Nursery", contactNumber: "", whatsappNumber: "", email: "", address: "" }); useEffect(() => { api<Array<{ key: string; value: string }>>("/settings").then((items) => setValues((current) => items.reduce((next, item) => ({ ...next, [item.key]: item.value }), current))).catch(() => undefined); }, []); async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); await Promise.all(Object.entries(values).map(([key, value]) => api(`/settings/${key}`, { method: "PATCH", body: JSON.stringify({ value }) }))); setSaved(true); } return <><div className="page-toolbar"><div><p className="kicker">Site configuration</p><h2>Settings</h2><p className="muted">These values can be consumed by the customer website.</p></div></div><form className="settings-form panel" onSubmit={submit}>{Object.entries(values).map(([key, value]) => <label key={key}>{key.replace(/([A-Z])/g, " $1")}<input value={value} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} /></label>)}{saved && <p className="status">Settings saved successfully.</p>}<button className="primary-button">Save settings</button></form></>; }
-
-function SectionPlaceholder({ name, categories, products, services }: { name: string; categories: Category[]; products: Product[]; services: Service[] }) { const count = name === "Categories" ? categories.length : name === "Catalog" ? products.length : name === "Customers" ? 0 : services.length; return <section className="placeholder panel"><div className="placeholder-mark"><PackageSearch size={26} /></div><p className="kicker">{name} workspace</p><h2>{name} management is ready for your next action.</h2><p>{count ? `${count} live records are connected from MongoDB.` : "The API endpoint is ready and waiting for its first records."}</p><button className="primary-button">Create {name.toLowerCase().replace(/s$/, "")}</button></section>; }
-
-export default App;
