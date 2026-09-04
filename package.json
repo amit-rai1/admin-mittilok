@@ -12,7 +12,8 @@
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
     "@types/react": "latest",
