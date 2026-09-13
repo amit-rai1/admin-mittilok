@@ -7,12 +7,23 @@ export function getApiOrigin() {
 
 /**
  * Resolve image paths stored in DB (`/uploads/...`) to a browser-loadable URL.
- * Absolute http(s)/data URLs are returned as-is.
+ * Absolute http(s)/data URLs are returned as-is (http paths are percent-encoded).
  */
 export function mediaUrl(path?: string | null, fallback = "") {
   if (!path || !path.trim()) return fallback;
   const value = path.trim();
-  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+
+  if (/^(data:|blob:)/i.test(value)) return value;
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value.replace(/ /g, "%20"));
+      url.pathname = encodePathSegments(url.pathname);
+      return url.toString();
+    } catch {
+      return value;
+    }
+  }
 
   let normalized = value.startsWith("/") ? value : `/${value}`;
   // Legacy paths saved before /uploads prefix
@@ -27,7 +38,21 @@ export function mediaUrl(path?: string | null, fallback = "") {
     normalized = `/uploads${normalized}`;
   }
 
-  return `${getApiOrigin()}${normalized}`;
+  return `${getApiOrigin()}${encodePathSegments(normalized)}`;
+}
+
+function encodePathSegments(pathname: string) {
+  return pathname
+    .split("/")
+    .map((segment) => {
+      if (!segment) return "";
+      try {
+        return encodeURIComponent(decodeURIComponent(segment));
+      } catch {
+        return encodeURIComponent(segment);
+      }
+    })
+    .join("/");
 }
 
 const TOKEN_KEY = "mittilok-admin-token";
