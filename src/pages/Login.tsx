@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
-import { Leaf } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
@@ -29,9 +28,7 @@ export function LoginPage() {
     <main className="login-page">
       <div className="login-art">
         <div className="brand">
-          <span>
-            <Leaf size={20} />
-          </span>
+          <img className="brand-logo" src="/logo.png" alt="MittiLok" />
           <strong>MittiLok</strong>
         </div>
         <div>
