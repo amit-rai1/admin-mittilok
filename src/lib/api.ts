@@ -307,7 +307,7 @@ export type Coupon = {
   discountType: number;
   percentage?: number | null;
   fixedAmount?: number | null;
-  minimumOrder: number;
+ minimumOrder?: number | null;
   maximumDiscount?: number | null;
   startDate: string;
   endDate: string;

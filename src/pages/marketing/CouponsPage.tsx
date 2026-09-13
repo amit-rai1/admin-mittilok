@@ -8,7 +8,7 @@ const blank: Omit<Coupon, "id"> = {
   discountType: 0,
   percentage: 10,
   fixedAmount: null,
-  minimumOrder: 0,
+  minimumOrder: null,
   maximumDiscount: null,
   startDate: new Date().toISOString().slice(0, 16),
   endDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 16),
@@ -200,8 +200,13 @@ export function CouponsPage() {
               <input
                 type="number"
                 min={0}
-                value={form.minimumOrder}
-                onChange={(e) => setForm({ ...form, minimumOrder: Number(e.target.value) })}
+                value={form.minimumOrder ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    minimumOrder: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
               />
             </label>
             <div className="form-two">
