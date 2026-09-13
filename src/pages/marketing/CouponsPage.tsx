@@ -200,7 +200,7 @@ export function CouponsPage() {
               <input
                 type="number"
                 min={0}
-                value={form.minimumOrder ?? ""}
+                value={form.minimumOrder === null || form.minimumOrder === undefined ? "" : form.minimumOrder}
                 onChange={(e) =>
                   setForm({
                     ...form,
