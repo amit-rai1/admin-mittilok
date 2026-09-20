@@ -120,7 +120,9 @@ export function Layout() {
     <div className="app-shell">
       <aside className={open ? "sidebar open" : "sidebar"}>
         <div className="sidebar-brand">
-          <img className="brand-logo" src="/logo.png" alt="MittiLok" />
+          <span className="brand-logo-wrap">
+            <img className="brand-logo" src="/logo.png" alt="MittiLok" />
+          </span>
           <strong>MittiLok</strong>
           <button type="button" className="close-menu" onClick={() => setOpen(false)} aria-label="Close menu">
             <X size={18} />

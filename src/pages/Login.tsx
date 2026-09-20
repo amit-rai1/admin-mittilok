@@ -28,7 +28,9 @@ export function LoginPage() {
     <main className="login-page">
       <div className="login-art">
         <div className="brand">
-          <img className="brand-logo" src="/logo.png" alt="MittiLok" />
+          <span className="brand-logo-wrap">
+            <img className="brand-logo" src="/logo.png" alt="MittiLok" />
+          </span>
           <strong>MittiLok</strong>
         </div>
         <div>
