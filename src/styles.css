@@ -88,13 +88,17 @@ p {
 .sidebar-brand .brand-logo-wrap,
 .brand .brand-logo-wrap {
   display: inline-flex;
-  width: 36px;
-  height: 36px;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  background: #f59d1e;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  padding: 3px;
+  box-sizing: border-box;
 }
 
 .sidebar-brand .brand-logo,
@@ -102,10 +106,18 @@ p {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: 6% 50%;
-  transform: scale(1.55);
-  transform-origin: 12% center;
+  object-fit: contain;
+  object-position: center;
+  transform: none;
+  border-radius: 0;
+}
+
+/* Login hero: keep brand name visible next to logo */
+.login-art .brand strong {
+  display: inline;
+  color: #fff;
+  font-size: 20px;
+  letter-spacing: -0.04em;
 }
 
 .sidebar-brand span:not(.brand-logo-wrap),

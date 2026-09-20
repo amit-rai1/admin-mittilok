@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
 import { api, formatMoney, mediaUrl, uploadImage } from "../../lib/api";
 
@@ -27,6 +27,51 @@ type Addon = {
 const blankPot: Pot = { id: 0, name: "", material: "", colour: "", image: "", priceDelta: 0, stock: 100, isActive: true, displayOrder: 0 };
 const blankAddon: Addon = { id: 0, name: "", description: "", image: "", price: 0, isActive: true, displayOrder: 0 };
 
+const thumbStyle: CSSProperties = { width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 };
+const placeholderStyle: CSSProperties = {
+  ...thumbStyle,
+  background: "#e8ebe9",
+  display: "inline-block",
+};
+
+function OptionThumb({ image, alt }: { image?: string | null; alt: string }) {
+  if (image) return <img src={mediaUrl(image)} alt={alt} style={thumbStyle} />;
+  return <span style={placeholderStyle} aria-hidden />;
+}
+
+function ImageField({
+  image,
+  uploading,
+  onUpload,
+  onClear,
+}: {
+  image?: string | null;
+  uploading: boolean;
+  onUpload: (file: File | null) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <label>
+        Image
+        <input type="file" accept="image/*" disabled={uploading} onChange={(e) => onUpload(e.target.files?.[0] ?? null)} />
+      </label>
+      {uploading ? <small>Uploading…</small> : null}
+      {image ? (
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <img src={mediaUrl(image)} alt="Current" style={{ width: 96, height: 96, borderRadius: 8, objectFit: "cover" }} />
+          <div style={{ display: "grid", gap: 6 }}>
+            <small>Current image</small>
+            <button type="button" onClick={onClear}>
+              Remove image
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function FestivalOptionsPage() {
   const [pots, setPots] = useState<Pot[]>([]);
   const [addons, setAddons] = useState<Addon[]>([]);
@@ -35,6 +80,7 @@ export function FestivalOptionsPage() {
   const [potForm, setPotForm] = useState<Pot | null>(null);
   const [addonForm, setAddonForm] = useState<Addon | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -56,6 +102,16 @@ export function FestivalOptionsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  function openPotForm(pot: Pot) {
+    setAddonForm(null);
+    setPotForm(pot);
+  }
+
+  function openAddonForm(addon: Addon) {
+    setPotForm(null);
+    setAddonForm(addon);
+  }
 
   async function savePot(event: FormEvent) {
     event.preventDefault();
@@ -89,6 +145,7 @@ export function FestivalOptionsPage() {
 
   async function upload(file: File | null, kind: "pot" | "addon") {
     if (!file) return;
+    setUploading(true);
     try {
       const uploaded = await uploadImage(file, "festivals");
       const path = uploaded.path || uploaded.url;
@@ -96,6 +153,8 @@ export function FestivalOptionsPage() {
       else setAddonForm((prev) => (prev ? { ...prev, image: path } : prev));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -110,20 +169,20 @@ export function FestivalOptionsPage() {
           <section className="panel">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2>Pots</h2>
-              <button type="button" className="primary-button" onClick={() => setPotForm({ ...blankPot })}>
+              <button type="button" className="primary-button" onClick={() => openPotForm({ ...blankPot })}>
                 + Pot
               </button>
             </div>
             {pots.map((p) => (
               <div key={p.id} className="table-row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 0" }}>
-                {p.image ? <img src={mediaUrl(p.image)} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: "cover" }} /> : null}
+                <OptionThumb image={p.image} alt={p.name} />
                 <div style={{ flex: 1 }}>
                   <strong>{p.name}</strong>
                   <small>
                     {formatMoney(p.priceDelta)} delta · stock {p.stock} · {p.isActive ? "Active" : "Off"}
                   </small>
                 </div>
-                <button type="button" onClick={() => setPotForm(p)}>
+                <button type="button" onClick={() => openPotForm(p)}>
                   Edit
                 </button>
                 <button
@@ -142,19 +201,20 @@ export function FestivalOptionsPage() {
           <section className="panel">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2>Add-ons</h2>
-              <button type="button" className="primary-button" onClick={() => setAddonForm({ ...blankAddon })}>
+              <button type="button" className="primary-button" onClick={() => openAddonForm({ ...blankAddon })}>
                 + Add-on
               </button>
             </div>
             {addons.map((a) => (
               <div key={a.id} className="table-row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 0" }}>
+                <OptionThumb image={a.image} alt={a.name} />
                 <div style={{ flex: 1 }}>
                   <strong>{a.name}</strong>
                   <small>
                     {formatMoney(a.price)} · {a.isActive ? "Active" : "Off"}
                   </small>
                 </div>
-                <button type="button" onClick={() => setAddonForm(a)}>
+                <button type="button" onClick={() => openAddonForm(a)}>
                   Edit
                 </button>
                 <button
@@ -196,10 +256,12 @@ export function FestivalOptionsPage() {
               Stock
               <input type="number" value={potForm.stock} onChange={(e) => setPotForm({ ...potForm, stock: Number(e.target.value) })} />
             </label>
-            <label>
-              Image
-              <input type="file" accept="image/*" onChange={(e) => void upload(e.target.files?.[0] ?? null, "pot")} />
-            </label>
+            <ImageField
+              image={potForm.image}
+              uploading={uploading}
+              onUpload={(file) => void upload(file, "pot")}
+              onClear={() => setPotForm({ ...potForm, image: "" })}
+            />
             <label>
               <input type="checkbox" checked={potForm.isActive} onChange={(e) => setPotForm({ ...potForm, isActive: e.target.checked })} /> Active
             </label>
@@ -207,7 +269,7 @@ export function FestivalOptionsPage() {
               <button type="button" onClick={() => setPotForm(null)}>
                 Cancel
               </button>
-              <button className="primary-button" disabled={saving}>
+              <button className="primary-button" disabled={saving || uploading}>
                 Save
               </button>
             </div>
@@ -231,10 +293,12 @@ export function FestivalOptionsPage() {
               Price
               <input type="number" value={addonForm.price} onChange={(e) => setAddonForm({ ...addonForm, price: Number(e.target.value) })} />
             </label>
-            <label>
-              Image
-              <input type="file" accept="image/*" onChange={(e) => void upload(e.target.files?.[0] ?? null, "addon")} />
-            </label>
+            <ImageField
+              image={addonForm.image}
+              uploading={uploading}
+              onUpload={(file) => void upload(file, "addon")}
+              onClear={() => setAddonForm({ ...addonForm, image: "" })}
+            />
             <label>
               <input type="checkbox" checked={addonForm.isActive} onChange={(e) => setAddonForm({ ...addonForm, isActive: e.target.checked })} /> Active
             </label>
@@ -242,7 +306,7 @@ export function FestivalOptionsPage() {
               <button type="button" onClick={() => setAddonForm(null)}>
                 Cancel
               </button>
-              <button className="primary-button" disabled={saving}>
+              <button className="primary-button" disabled={saving || uploading}>
                 Save
               </button>
             </div>

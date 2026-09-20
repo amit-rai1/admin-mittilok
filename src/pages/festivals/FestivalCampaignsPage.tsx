@@ -36,7 +36,7 @@ type FestivalCampaign = {
   products: FestivalProduct[];
 };
 
-type ProductListItem = { id: number; name: string; slug: string; sellingPrice: number };
+type ProductListItem = { id: number; name: string; slug: string; sellingPrice: number; thumbnail?: string | null };
 
 const STATUS = ["Draft", "Scheduled", "Live", "Closed"];
 
@@ -79,8 +79,10 @@ export function FestivalCampaignsPage() {
   const [attachId, setAttachId] = useState<number | null>(null);
   const [productQuery, setProductQuery] = useState("");
   const [productHits, setProductHits] = useState<ProductListItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductListItem | null>(null);
   const [festivalPrice, setFestivalPrice] = useState("");
   const [stockCap, setStockCap] = useState("");
+  const [attaching, setAttaching] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -98,15 +100,35 @@ export function FestivalCampaignsPage() {
     void load();
   }, []);
 
-  async function searchProducts(q: string) {
+  function openAttach(campaignId: number) {
+    setAttachId(campaignId);
+    setProductQuery("");
+    setProductHits([]);
+    setSelectedProduct(null);
+    setFestivalPrice("");
+    setStockCap("");
+  }
+
+  function closeAttach() {
+    setAttachId(null);
+    setProductQuery("");
+    setProductHits([]);
+    setSelectedProduct(null);
+    setFestivalPrice("");
+    setStockCap("");
+  }
+
+  async function searchProducts(q: string, campaign: FestivalCampaign) {
     setProductQuery(q);
+    setSelectedProduct(null);
     if (q.trim().length < 2) {
       setProductHits([]);
       return;
     }
     try {
       const res = await api<{ items: ProductListItem[] }>(`/products?query=${encodeURIComponent(q)}&pageSize=8`);
-      setProductHits(res.items ?? []);
+      const attachedIds = new Set((campaign.products ?? []).map((p) => p.productId));
+      setProductHits((res.items ?? []).filter((hit) => !attachedIds.has(hit.id)));
     } catch {
       setProductHits([]);
     }
@@ -159,27 +181,27 @@ export function FestivalCampaignsPage() {
     }
   }
 
-  async function attachProduct(campaignId: number, product: ProductListItem) {
+  async function attachProduct(campaignId: number) {
+    if (!selectedProduct) return;
+    setAttaching(true);
     try {
       await api(`/admin/festivals/${campaignId}/products`, {
         method: "POST",
         body: {
           id: 0,
-          productId: product.id,
+          productId: selectedProduct.id,
           festivalPrice: festivalPrice ? Number(festivalPrice) : null,
           stockCap: stockCap ? Number(stockCap) : null,
           displayOrder: 0,
           isActive: true,
         },
       });
-      setAttachId(null);
-      setProductQuery("");
-      setProductHits([]);
-      setFestivalPrice("");
-      setStockCap("");
+      closeAttach();
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to attach product");
+    } finally {
+      setAttaching(false);
     }
   }
 
@@ -231,32 +253,157 @@ export function FestivalCampaignsPage() {
                 {item.banner ? <img src={mediaUrl(item.banner)} alt="" style={{ width: 72, height: 40, objectFit: "cover", borderRadius: 6, marginTop: 6 }} /> : null}
                 <div style={{ marginTop: 8 }}>
                   <small>{item.products?.length ?? 0} products</small>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12 }}>
+                  <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
                     {(item.products ?? []).map((p) => (
-                      <li key={p.id}>
-                        {p.productName} · {formatMoney(p.festivalPrice ?? p.basePrice)}{" "}
+                      <div
+                        key={p.id}
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                          padding: "6px 8px",
+                          background: "#f4f6f4",
+                          borderRadius: 8,
+                        }}
+                      >
+                        {p.thumbnail ? (
+                          <img
+                            src={mediaUrl(p.thumbnail)}
+                            alt=""
+                            width={36}
+                            height={36}
+                            style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 6,
+                              background: "#e0e5e0",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong style={{ display: "block", fontSize: 13 }}>{p.productName}</strong>
+                          <small>{formatMoney(p.festivalPrice ?? p.basePrice)}</small>
+                        </div>
                         <button type="button" className="linkish" onClick={() => void detach(p.id)}>
-                          remove
+                          Remove
                         </button>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                   {attachId === item.id ? (
-                    <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
-                      <input placeholder="Search products…" value={productQuery} onChange={(e) => void searchProducts(e.target.value)} />
-                      <input placeholder="Festival price (optional)" value={festivalPrice} onChange={(e) => setFestivalPrice(e.target.value)} />
-                      <input placeholder="Stock cap (optional)" value={stockCap} onChange={(e) => setStockCap(e.target.value)} />
-                      {productHits.map((hit) => (
-                        <button key={hit.id} type="button" className="secondary-button" onClick={() => void attachProduct(item.id, hit)}>
-                          Attach {hit.name}
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: "grid",
+                        gap: 8,
+                        padding: 10,
+                        border: "1px solid #d7ddd7",
+                        borderRadius: 10,
+                        background: "#fff",
+                      }}
+                    >
+                      <small style={{ color: "#5a6b5e" }}>Search → select one product → optional price/stock → Attach</small>
+                      <input
+                        placeholder="Search products…"
+                        value={productQuery}
+                        onChange={(e) => void searchProducts(e.target.value, item)}
+                        autoFocus
+                      />
+                      {productHits.length > 0 && (
+                        <div style={{ display: "grid", gap: 4, maxHeight: 220, overflow: "auto" }}>
+                          {productHits.map((hit) => {
+                            const selected = selectedProduct?.id === hit.id;
+                            return (
+                              <button
+                                key={hit.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProduct(hit);
+                                  setFestivalPrice(String(hit.sellingPrice));
+                                }}
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  alignItems: "center",
+                                  textAlign: "left",
+                                  padding: "6px 8px",
+                                  borderRadius: 8,
+                                  border: selected ? "2px solid #1b5e20" : "1px solid #e0e5e0",
+                                  background: selected ? "#eef6ee" : "#fff",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {hit.thumbnail ? (
+                                  <img
+                                    src={mediaUrl(hit.thumbnail)}
+                                    alt=""
+                                    width={36}
+                                    height={36}
+                                    style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }}
+                                  />
+                                ) : (
+                                  <span
+                                    style={{
+                                      width: 36,
+                                      height: 36,
+                                      borderRadius: 6,
+                                      background: "#e8ebe8",
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                )}
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                  <strong style={{ display: "block", fontSize: 13 }}>{hit.name}</strong>
+                                  <small>{formatMoney(hit.sellingPrice)}</small>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {productQuery.trim().length >= 2 && productHits.length === 0 && (
+                        <small style={{ color: "#5a6b5e" }}>No matching products (or already attached).</small>
+                      )}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                        <input
+                          placeholder="Festival price (optional)"
+                          value={festivalPrice}
+                          onChange={(e) => setFestivalPrice(e.target.value)}
+                          type="number"
+                        />
+                        <input
+                          placeholder="Stock cap (optional)"
+                          value={stockCap}
+                          onChange={(e) => setStockCap(e.target.value)}
+                          type="number"
+                        />
+                      </div>
+                      {selectedProduct && (
+                        <small>
+                          Selected: <strong>{selectedProduct.name}</strong>
+                        </small>
+                      )}
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button type="button" onClick={closeAttach}>
+                          Cancel
                         </button>
-                      ))}
-                      <button type="button" onClick={() => setAttachId(null)}>
-                        Cancel
-                      </button>
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={!selectedProduct || attaching}
+                          onClick={() => void attachProduct(item.id)}
+                        >
+                          {attaching ? "Attaching…" : "Attach"}
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <button type="button" className="secondary-button" style={{ marginTop: 6 }} onClick={() => setAttachId(item.id)}>
+                    <button type="button" className="secondary-button" style={{ marginTop: 8 }} onClick={() => openAttach(item.id)}>
                       + Attach product
                     </button>
                   )}
