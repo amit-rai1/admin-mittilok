@@ -16,6 +16,10 @@ import { ServicesPage } from "./pages/services/ServicesPage";
 import { BookingsPage } from "./pages/services/BookingsPage";
 import { EnquiriesPage } from "./pages/services/EnquiriesPage";
 import { PodcastBookingsPage } from "./pages/podcast/PodcastBookingsPage";
+import { FestivalCampaignsPage } from "./pages/festivals/FestivalCampaignsPage";
+import { FestivalOptionsPage } from "./pages/festivals/FestivalOptionsPage";
+import { FestivalBookingsPage } from "./pages/festivals/FestivalBookingsPage";
+import { FestivalDemandPage } from "./pages/festivals/FestivalDemandPage";
 import { CouponsPage } from "./pages/marketing/CouponsPage";
 import { BannersPage } from "./pages/marketing/BannersPage";
 import { HomepagePage } from "./pages/content/HomepagePage";
@@ -58,6 +62,10 @@ export default function App() {
         <Route path="services/bookings" element={<BookingsPage />} />
         <Route path="services/enquiries" element={<EnquiriesPage />} />
         <Route path="podcast/bookings" element={<PodcastBookingsPage />} />
+        <Route path="festivals" element={<FestivalCampaignsPage />} />
+        <Route path="festivals/options" element={<FestivalOptionsPage />} />
+        <Route path="festivals/bookings" element={<FestivalBookingsPage />} />
+        <Route path="festivals/demand/:campaignId" element={<FestivalDemandPage />} />
         <Route path="marketing/coupons" element={<CouponsPage />} />
         <Route path="marketing/banners" element={<BannersPage />} />
         <Route path="content/homepage" element={<HomepagePage />} />

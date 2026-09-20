@@ -56,6 +56,14 @@ const NAV: NavGroup[] = [
     items: [{ to: "/podcast/bookings", label: "Bookings", icon: Mic2 }],
   },
   {
+    label: "Festivals",
+    items: [
+      { to: "/festivals", label: "Campaigns", icon: CalendarDays },
+      { to: "/festivals/options", label: "Pots & add-ons", icon: Package },
+      { to: "/festivals/bookings", label: "Bookings", icon: ShoppingBag },
+    ],
+  },
+  {
     label: "Orders",
     items: [
       { to: "/orders", label: "Orders", icon: ShoppingBag },
@@ -95,6 +103,9 @@ const TITLE_MAP: Record<string, string> = {
   "/services/bookings": "Service bookings",
   "/services/enquiries": "Enquiries",
   "/podcast/bookings": "Podcast bookings",
+  "/festivals": "Festival campaigns",
+  "/festivals/options": "Festival pots & add-ons",
+  "/festivals/bookings": "Festival bookings",
   "/marketing/coupons": "Coupons",
   "/marketing/banners": "Banners",
   "/content/homepage": "Homepage",

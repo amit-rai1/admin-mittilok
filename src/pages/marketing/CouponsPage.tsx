@@ -180,8 +180,10 @@ export function CouponsPage() {
                   type="number"
                   min={0}
                   max={100}
-                  value={form.percentage ?? 0}
-                  onChange={(e) => setForm({ ...form, percentage: Number(e.target.value) })}
+                  value={form.percentage ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, percentage: e.target.value === "" ? null : Number(e.target.value) })
+                  }
                 />
               </label>
             ) : (
@@ -190,8 +192,10 @@ export function CouponsPage() {
                 <input
                   type="number"
                   min={0}
-                  value={form.fixedAmount ?? 0}
-                  onChange={(e) => setForm({ ...form, fixedAmount: Number(e.target.value) })}
+                  value={form.fixedAmount ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, fixedAmount: e.target.value === "" ? null : Number(e.target.value) })
+                  }
                 />
               </label>
             )}
@@ -200,12 +204,9 @@ export function CouponsPage() {
               <input
                 type="number"
                 min={0}
-                value={form.minimumOrder === null || form.minimumOrder === undefined ? "" : form.minimumOrder}
+                value={form.minimumOrder || ""}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    minimumOrder: e.target.value === "" ? null : Number(e.target.value),
-                  })
+                  setForm({ ...form, minimumOrder: e.target.value === "" ? 0 : Number(e.target.value) })
                 }
               />
             </label>
