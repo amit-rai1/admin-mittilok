@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import { api, formatDate, formatMoney, type PagedResult } from "../../lib/api";
 
 type Customer = {
@@ -17,6 +18,7 @@ export function CustomersPage() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<Customer> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export function CustomersPage() {
       setLoading(true);
       setError("");
       try {
-        const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
         if (search.trim()) params.set("search", search.trim());
         const result = await api<PagedResult<Customer>>(`/admin/customers?${params}`);
         if (!cancelled) setData(result);
@@ -42,7 +44,7 @@ export function CustomersPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, search]);
+  }, [page, pageSize, search]);
 
   async function toggleActive(customer: Customer) {
     setBusyId(customer.id);
@@ -72,30 +74,21 @@ export function CustomersPage() {
   return (
     <>
       <PageHeader title="Customers" subtitle="Registered storefront customers and spend summary." />
-      <div className="toolbar-row">
-        <input
-          className="search-input"
-          placeholder="Search by name, email or phone…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              setPage(1);
-              setSearch(query);
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            setPage(1);
-            setSearch(query);
-          }}
-        >
-          Search
-        </button>
-      </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search by name, email or phone…"
+        onApply={() => {
+          setPage(1);
+          setSearch(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setSearch("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -133,7 +126,16 @@ export function CustomersPage() {
         </section>
       )}
       {data && (
-        <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
       )}
     </>
   );

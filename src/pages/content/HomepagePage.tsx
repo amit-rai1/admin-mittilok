@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, type HomepageSection } from "../../lib/api";
 
 const blank: HomepageSection = {
@@ -16,6 +18,10 @@ export function HomepagePage() {
   const [items, setItems] = useState<HomepageSection[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<HomepageSection>(blank);
   const [saving, setSaving] = useState(false);
@@ -24,7 +30,7 @@ export function HomepagePage() {
     setLoading(true);
     setError("");
     try {
-      setItems(await api<HomepageSection[]>("/content/homepage"));
+      setItems(await api<HomepageSection[]>("/admin/content/sections"));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load homepage sections");
     } finally {
@@ -61,6 +67,14 @@ export function HomepagePage() {
     }
   }
 
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.key} ${item.title} ${item.sectionType}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
+
   return (
     <>
       <PageHeader
@@ -71,6 +85,21 @@ export function HomepagePage() {
             + Add section
           </button>
         }
+      />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search sections…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
       />
       <ErrorBanner message={error} />
       {loading ? (
@@ -84,7 +113,7 @@ export function HomepagePage() {
             <span>Order</span>
             <span>Status</span>
           </div>
-          {items.map((item) => (
+          {paged.items.map((item) => (
             <button type="button" className="table-row cols-5 link-row" key={item.id || item.key} onClick={() => openEdit(item)}>
               <strong>{item.key}</strong>
               <span>{item.title}</span>
@@ -93,9 +122,19 @@ export function HomepagePage() {
               <span className={item.isEnabled ? "badge badge-success" : "badge"}>{item.isEnabled ? "Enabled" : "Disabled"}</span>
             </button>
           ))}
-          {items.length === 0 && <EmptyState message="No homepage sections yet." />}
+          {paged.items.length === 0 && <EmptyState message="No homepage sections yet." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -123,10 +162,10 @@ export function HomepagePage() {
             </label>
             <label>
               Display order
-              <input
-                type="number"
+              <NumberField
                 value={form.displayOrder}
-                onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
+                onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                allowDecimal={false}
               />
             </label>
             <label>

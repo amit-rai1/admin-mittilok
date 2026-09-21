@@ -1,10 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import { api, type InventoryItem, type PagedResult } from "../../lib/api";
 
 export function InventoryPage() {
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [lowOnly, setLowOnly] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<InventoryItem> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -17,8 +21,9 @@ export function InventoryPage() {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "50" });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (lowOnly) params.set("lowStockOnly", "true");
+      if (appliedQuery.trim()) params.set("query", appliedQuery.trim());
       setData(await api<PagedResult<InventoryItem>>(`/admin/inventory?${params}`));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load inventory");
@@ -29,7 +34,7 @@ export function InventoryPage() {
 
   useEffect(() => {
     void load();
-  }, [page, lowOnly]);
+  }, [page, pageSize, lowOnly, appliedQuery]);
 
   async function onAdjust(event: FormEvent) {
     event.preventDefault();
@@ -56,20 +61,36 @@ export function InventoryPage() {
 
   return (
     <>
-      <PageHeader title="Inventory" subtitle="Stock levels and low-stock alerts." />
-      <div className="toolbar-row">
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={lowOnly}
-            onChange={(e) => {
-              setPage(1);
-              setLowOnly(e.target.checked);
-            }}
-          />
-          Low stock only
-        </label>
-      </div>
+      <PageHeader title="Inventory" subtitle="Search by product name or SKU." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search product or SKU…"
+        filters={
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={lowOnly}
+              onChange={(e) => {
+                setPage(1);
+                setLowOnly(e.target.checked);
+              }}
+            />
+            Low stock only
+          </label>
+        }
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setLowOnly(false);
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -106,7 +127,18 @@ export function InventoryPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No inventory rows found." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
 
       {adjusting && (
         <div className="modal-backdrop">
@@ -123,7 +155,12 @@ export function InventoryPage() {
             <p className="muted">Use positive numbers to add stock, negative to reduce.</p>
             <label>
               Quantity delta
-              <input type="number" value={qty} onChange={(e) => setQty(e.target.value)} required />
+              <input
+                inputMode="text"
+                value={qty}
+                onChange={(e) => setQty(e.target.value.replace(/[^0-9.\-]/g, ""))}
+                required
+              />
             </label>
             <label>
               Notes

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   formatDate,
@@ -12,7 +13,10 @@ import {
 } from "../../lib/api";
 
 export function PodcastBookingsPage() {
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<PodcastBooking> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -21,8 +25,11 @@ export function PodcastBookingsPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError("");
       try {
-        const result = await api<PagedResult<PodcastBooking>>(`/admin/podcast/bookings?page=${page}&pageSize=20`);
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+        if (appliedQuery.trim()) params.set("query", appliedQuery.trim());
+        const result = await api<PagedResult<PodcastBooking>>(`/admin/podcast/bookings?${params}`);
         if (!cancelled) setData(result);
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "Unable to load podcast bookings");
@@ -34,11 +41,26 @@ export function PodcastBookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, pageSize, appliedQuery]);
 
   return (
     <>
-      <PageHeader title="Podcast bookings" subtitle="Studio and guest booking requests." />
+      <PageHeader title="Podcast bookings" subtitle="Search by guest, mobile, topic, or booking #." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search guest, mobile, topic…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -73,7 +95,18 @@ export function PodcastBookingsPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No podcast bookings yet." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
     </>
   );
 }

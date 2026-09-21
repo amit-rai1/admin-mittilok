@@ -619,6 +619,105 @@ label {
   font-size: 13px;
 }
 
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 120px;
+}
+
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d5ddd2;
+  border-top-color: var(--forest, #1b5e20);
+  border-radius: 50%;
+  animation: admin-spin .7s linear infinite;
+}
+
+@keyframes admin-spin {
+  to { transform: rotate(360deg); }
+}
+
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.list-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.list-toolbar-main .search-input {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.list-toolbar-main select {
+  width: auto;
+  min-width: 140px;
+}
+
+.list-toolbar-count {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.list-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0;
+}
+
+.list-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 8px 8px 0 0;
+}
+
+.list-tab:hover {
+  color: var(--ink);
+  background: var(--green-soft);
+}
+
+.list-tab.active {
+  color: var(--green);
+  border-bottom-color: var(--green);
+  background: transparent;
+}
+
+.image-field {
+  display: grid;
+  gap: 8px;
+}
+
+.image-field-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .boot-screen {
   min-height: 100vh;
   display: grid;
@@ -787,6 +886,25 @@ label {
   gap: 14px;
   margin-top: 14px;
   font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.pagination-size select {
+  width: auto;
+  min-width: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
 }
 
 .pagination button {
@@ -998,6 +1116,126 @@ label {
 .thumb-cell.large {
   width: 96px;
   height: 96px;
+}
+
+.thumb-cell.with-label {
+  width: auto;
+  height: auto;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: visible;
+}
+
+.thumb-cell.with-label img,
+.thumb-cell.with-label > span:first-child {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.split-panels {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 960px) {
+  .split-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.festival-campaign-row {
+  align-items: start;
+}
+
+.festival-banner-thumb {
+  width: 72px;
+  height: 40px;
+  margin-top: 6px;
+}
+
+.festival-product-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.festival-product-chips {
+  display: grid;
+  gap: 6px;
+}
+
+.festival-product-chip,
+.festival-hit {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: #f4f6f4;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  text-align: left;
+  width: 100%;
+}
+
+.festival-product-chip img,
+.festival-hit img,
+.festival-product-chip-ph {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e0e5e0;
+}
+
+.festival-product-chip strong,
+.festival-hit strong {
+  display: block;
+  font-size: 13px;
+}
+
+.festival-attach-box {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.festival-product-hits {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.festival-hit {
+  background: #fff;
+  border-color: #e0e5e0;
+  cursor: pointer;
+}
+
+.festival-hit.selected {
+  border-color: var(--green);
+  border-width: 2px;
+  background: #eef6ee;
+}
+
+.booking-open-now {
+  display: block;
+  color: var(--green);
+}
+
+.table-row.unread {
+  background: var(--green-soft);
 }
 
 .thumb-placeholder {

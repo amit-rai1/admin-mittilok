@@ -1,12 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import { api, formatDate, type Notification, type NotificationList } from "../../lib/api";
 
 export function NotificationsPage() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<NotificationList | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -15,7 +19,7 @@ export function NotificationsPage() {
     setLoading(true);
     setError("");
     try {
-      setData(await api<NotificationList>(`/admin/notifications?page=${page}&pageSize=20`));
+      setData(await api<NotificationList>(`/admin/notifications?page=${page}&pageSize=${pageSize}`));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load notifications");
     } finally {
@@ -25,7 +29,14 @@ export function NotificationsPage() {
 
   useEffect(() => {
     void load();
-  }, [page]);
+  }, [page, pageSize]);
+
+  const filteredItems = useMemo(() => {
+    const items = data?.items ?? [];
+    const q = appliedQuery.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => `${item.title} ${item.message}`.toLowerCase().includes(q));
+  }, [data, appliedQuery]);
 
   async function markAll() {
     try {
@@ -94,31 +105,62 @@ export function NotificationsPage() {
         </div>
       </form>
 
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Filter by title or message…"
+        onApply={() => setAppliedQuery(query)}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+        }}
+        resultLabel={
+          data
+            ? appliedQuery
+              ? `${filteredItems.length} matched on this page · ${resultRange(data.page, data.pageSize, data.totalCount)}`
+              : resultRange(data.page, data.pageSize, data.totalCount)
+            : undefined
+        }
+      />
+
       {loading ? (
         <LoadingState />
       ) : (
-        <section className="panel">
-          <div className="stack-list">
-            {(data?.items ?? []).map((item) => (
-              <button
-                type="button"
-                className={`stack-row notif-row ${item.isRead ? "" : "unread"}`}
-                key={item.id}
-                onClick={() => void markRead(item)}
-              >
-                <div>
-                  <strong>{item.title}</strong>
-                  <small>{item.message}</small>
-                </div>
-                <span>{formatDate(item.createdAt)}</span>
-              </button>
-            ))}
-            {(data?.items.length ?? 0) === 0 && <EmptyState message="No notifications." />}
+        <section className="panel data-table">
+          <div className="table-head cols-3">
+            <span>Notification</span>
+            <span>Status</span>
+            <span>When</span>
           </div>
+          {filteredItems.map((item) => (
+            <button
+              type="button"
+              className={`table-row cols-3 link-row ${item.isRead ? "" : "unread"}`}
+              key={item.id}
+              onClick={() => void markRead(item)}
+            >
+              <div>
+                <strong>{item.title}</strong>
+                <small>{item.message}</small>
+              </div>
+              <span>{item.isRead ? "Read" : "Unread"}</span>
+              <span>{formatDate(item.createdAt)}</span>
+            </button>
+          ))}
+          {filteredItems.length === 0 && <EmptyState message="No notifications." />}
         </section>
       )}
       {data && (
-        <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
       )}
     </>
   );

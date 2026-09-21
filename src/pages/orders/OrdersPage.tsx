@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { DEFAULT_PAGE_SIZE, resultRange } from "../../lib/listPaging";
 import {
   api,
   formatDate,
@@ -13,8 +14,11 @@ import {
 } from "../../lib/api";
 
 export function OrdersPage() {
-  const [status, setStatus] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<Order> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,8 +29,9 @@ export function OrdersPage() {
       setLoading(true);
       setError("");
       try {
-        const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
         if (status !== "") params.set("status", status);
+        if (appliedQuery.trim()) params.set("search", appliedQuery.trim());
         const result = await api<PagedResult<Order>>(`/admin/orders?${params}`);
         if (!cancelled) setData(result);
       } catch (caught) {
@@ -39,27 +44,41 @@ export function OrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, status]);
+  }, [page, pageSize, status, appliedQuery]);
 
   return (
     <>
-      <PageHeader title="Orders" subtitle="Filter by fulfillment status and open any order for details." />
-      <div className="toolbar-row">
-        <select
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">All statuses</option>
-          {Object.entries(ORDER_STATUS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <PageHeader title="Orders" subtitle="Search by order number, customer name or phone." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search order #, name, phone…"
+        filters={
+          <select
+            value={status}
+            onChange={(e) => {
+              setPage(1);
+              setStatus(e.target.value);
+            }}
+          >
+            <option value="">All statuses</option>
+            {Object.entries(ORDER_STATUS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        }
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setStatus("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -91,7 +110,16 @@ export function OrdersPage() {
         </section>
       )}
       {data && (
-        <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
       )}
     </>
   );

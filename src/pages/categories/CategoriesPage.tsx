@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import {
   api,
   CATEGORY_TYPE,
@@ -26,6 +28,10 @@ export function CategoriesPage() {
   const [items, setItems] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm);
@@ -141,7 +147,22 @@ export function CategoriesPage() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading categories…" />;
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.name} ${item.slug} ${CATEGORY_TYPE[item.type] ?? ""}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Categories" subtitle="Root catalog lines only. Manage children on Subcategories." />
+        <LoadingState label="Loading categories…" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -154,6 +175,21 @@ export function CategoriesPage() {
           </button>
         }
       />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search categories…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
+      />
       <ErrorBanner message={error} />
       <section className="panel data-table">
         <div className="table-head cols-7">
@@ -165,7 +201,7 @@ export function CategoriesPage() {
           <span>Status</span>
           <span>Actions</span>
         </div>
-        {items.map((item) => (
+        {paged.items.map((item) => (
           <div className="table-row cols-7" key={item.id}>
             <div className="thumb-cell">
               {item.image ? <img src={mediaUrl(item.image)} alt="" /> : <span className="thumb-placeholder">—</span>}
@@ -200,8 +236,18 @@ export function CategoriesPage() {
             </div>
           </div>
         ))}
-        {items.length === 0 && <EmptyState message="No root categories yet." />}
+        {paged.items.length === 0 && <EmptyState message="No root categories yet." />}
       </section>
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -215,6 +261,7 @@ export function CategoriesPage() {
                 ×
               </button>
             </div>
+            <ErrorBanner message={error} />
             <label>
               Name *
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -256,10 +303,10 @@ export function CategoriesPage() {
               </label>
               <label>
                 Display order
-                <input
-                  type="number"
+                <NumberField
                   value={form.displayOrder}
-                  onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
+                  onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                  allowDecimal={false}
                 />
               </label>
             </div>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import {
   api,
   CATEGORY_TYPE,
@@ -32,6 +34,10 @@ export function SubcategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [listLoading, setListLoading] = useState(false);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm);
@@ -98,9 +104,20 @@ export function SubcategoriesPage() {
 
   function onParentChange(value: number | "") {
     setParentId(value);
+    setPage(1);
+    setQuery("");
+    setAppliedQuery("");
     if (value) setSearchParams({ parentId: String(value) });
     else setSearchParams({});
   }
+
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.name} ${item.slug}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
 
   function openCreate() {
     if (!parentId || !selectedParent) {
@@ -221,22 +238,37 @@ export function SubcategoriesPage() {
           </button>
         }
       />
-      <div className="toolbar-row">
-        <label className="inline-filter">
-          Parent category
-          <select
-            value={parentId}
-            onChange={(e) => onParentChange(e.target.value ? Number(e.target.value) : "")}
-          >
-            <option value="">Select category</option>
-            {parents.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({CATEGORY_TYPE[p.type] ?? "—"})
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search subcategories…"
+        filters={
+          <label className="inline-filter">
+            Parent
+            <select
+              value={parentId}
+              onChange={(e) => onParentChange(e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">Select category</option>
+              {parents.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({CATEGORY_TYPE[p.type] ?? "—"})
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
+      />
       <ErrorBanner message={error} />
       {listLoading ? (
         <LoadingState />
@@ -250,7 +282,7 @@ export function SubcategoriesPage() {
             <span>Status</span>
             <span>Actions</span>
           </div>
-          {items.map((item) => (
+          {paged.items.map((item) => (
             <div className="table-row cols-6" key={item.id}>
               <div className="thumb-cell">
                 {item.image ? <img src={mediaUrl(item.image)} alt="" /> : <span className="thumb-placeholder">—</span>}
@@ -277,9 +309,19 @@ export function SubcategoriesPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 && <EmptyState message="No subcategories for this category." />}
+          {paged.items.length === 0 && <EmptyState message="No subcategories for this category." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -347,10 +389,10 @@ export function SubcategoriesPage() {
             <div className="form-two">
               <label>
                 Display order
-                <input
-                  type="number"
+                <NumberField
                   value={form.displayOrder}
-                  onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
+                  onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                  allowDecimal={false}
                 />
               </label>
               <label className="check-row" style={{ alignSelf: "end", marginBottom: 8 }}>

@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, formatDate, formatMoney, mediaUrl, uploadImage } from "../../lib/api";
 
 type FestivalProduct = {
@@ -72,6 +74,10 @@ export function FestivalCampaignsPage() {
   const [items, setItems] = useState<FestivalCampaign[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FestivalCampaign>(blank);
   const [saving, setSaving] = useState(false);
@@ -149,6 +155,14 @@ export function FestivalCampaignsPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.name.trim()) {
+      setError("Festival name is required.");
+      return;
+    }
+    if (!form.bookingStart || !form.bookingEnd) {
+      setError("Booking start and end are required.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -215,6 +229,14 @@ export function FestivalCampaignsPage() {
     }
   }
 
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.name} ${item.slug} ${STATUS[item.status] ?? ""}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
+
   return (
     <>
       <PageHeader
@@ -233,6 +255,21 @@ export function FestivalCampaignsPage() {
           </button>
         }
       />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search festivals…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -245,7 +282,7 @@ export function FestivalCampaignsPage() {
             <span>Status</span>
             <span>Actions</span>
           </div>
-          {items.map((item) => (
+          {paged.items.map((item) => (
             <div key={item.id} className="table-row cols-5" style={{ alignItems: "start" }}>
               <div>
                 <strong>{item.name}</strong>
@@ -374,13 +411,13 @@ export function FestivalCampaignsPage() {
                           placeholder="Festival price (optional)"
                           value={festivalPrice}
                           onChange={(e) => setFestivalPrice(e.target.value)}
-                          type="number"
+                          inputMode="decimal"
                         />
                         <input
                           placeholder="Stock cap (optional)"
                           value={stockCap}
                           onChange={(e) => setStockCap(e.target.value)}
-                          type="number"
+                          inputMode="numeric"
                         />
                       </div>
                       {selectedProduct && (
@@ -440,14 +477,25 @@ export function FestivalCampaignsPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 && <EmptyState message="No festival campaigns yet." />}
+          {paged.items.length === 0 && <EmptyState message="No festival campaigns yet." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="drawer-backdrop" onClick={() => setFormOpen(false)}>
           <form className="side-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void onSubmit(e)}>
             <h2>{form.id ? "Edit festival" : "New festival"}</h2>
+            <ErrorBanner message={error} />
             <label>
               Name
               <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -487,7 +535,11 @@ export function FestivalCampaignsPage() {
             </label>
             <label>
               Advance %
-              <input type="number" min={1} max={100} value={form.advancePercent} onChange={(e) => setForm({ ...form, advancePercent: Number(e.target.value) })} />
+              <NumberField
+                value={form.advancePercent}
+                onChange={(n) => setForm({ ...form, advancePercent: n ?? 0 })}
+                allowDecimal={false}
+              />
             </label>
             <label>
               Status
@@ -501,7 +553,11 @@ export function FestivalCampaignsPage() {
             </label>
             <label>
               Display order
-              <input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })} />
+              <NumberField
+                value={form.displayOrder}
+                onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                allowDecimal={false}
+              />
             </label>
             <div className="sheet-actions">
               <button type="button" onClick={() => setFormOpen(false)}>

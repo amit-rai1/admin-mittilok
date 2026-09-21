@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
 import {
   api,
   mediaUrl,
@@ -471,36 +472,30 @@ export function ProductFormPage() {
           <div className="form-grid">
             <label>
               MRP
-              <input
-                type="number"
+              <NumberField
                 min={0}
-                step="0.01"
                 value={form.mrp}
-                onChange={(e) => updatePricing(Number(e.target.value), form.sellingPrice)}
+                onChange={(n) => updatePricing(n ?? 0, form.sellingPrice)}
               />
             </label>
             <label>
               Selling price
-              <input
-                type="number"
+              <NumberField
                 min={0}
-                step="0.01"
                 value={form.sellingPrice}
-                onChange={(e) => updatePricing(form.mrp, Number(e.target.value))}
+                onChange={(n) => updatePricing(form.mrp, n ?? 0)}
               />
             </label>
             <label>
               Discount %
-              <input type="number" value={form.discountPercent} readOnly />
+              <input value={form.discountPercent} readOnly />
             </label>
             <label>
               Tax %
-              <input
-                type="number"
+              <NumberField
                 min={0}
-                step="0.01"
                 value={form.taxPercent}
-                onChange={(e) => setForm((prev) => ({ ...prev, taxPercent: Number(e.target.value) }))}
+                onChange={(n) => setForm((prev) => ({ ...prev, taxPercent: n ?? 0 }))}
               />
             </label>
           </div>
@@ -511,22 +506,20 @@ export function ProductFormPage() {
           <div className="form-grid">
             <label>
               Stock
-              <input
-                type="number"
+              <NumberField
                 min={0}
+                allowDecimal={false}
                 value={form.stockQuantity}
-                onChange={(e) => setForm((prev) => ({ ...prev, stockQuantity: Number(e.target.value) }))}
+                onChange={(n) => setForm((prev) => ({ ...prev, stockQuantity: n ?? 0 }))}
               />
             </label>
             <label>
               Low stock alert
-              <input
-                type="number"
+              <NumberField
                 min={0}
+                allowDecimal={false}
                 value={form.lowStockThreshold}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, lowStockThreshold: Number(e.target.value) }))
-                }
+                onChange={(n) => setForm((prev) => ({ ...prev, lowStockThreshold: n ?? 0 }))}
               />
             </label>
             <div>
@@ -575,24 +568,23 @@ export function ProductFormPage() {
                       setForm((prev) => ({ ...prev, variants: next }));
                     }}
                   />
-                  <input
-                    type="number"
+                  <NumberField
                     placeholder="Price"
                     value={variant.price}
-                    onChange={(e) => {
+                    onChange={(n) => {
                       const next = [...variants];
-                      const price = Number(e.target.value);
+                      const price = n ?? 0;
                       next[index] = { ...variant, price, mrp: variant.mrp || price };
                       setForm((prev) => ({ ...prev, variants: next }));
                     }}
                   />
-                  <input
-                    type="number"
+                  <NumberField
                     placeholder="Stock"
+                    allowDecimal={false}
                     value={variant.stock}
-                    onChange={(e) => {
+                    onChange={(n) => {
                       const next = [...variants];
-                      next[index] = { ...variant, stock: Number(e.target.value) };
+                      next[index] = { ...variant, stock: n ?? 0 };
                       setForm((prev) => ({ ...prev, variants: next }));
                     }}
                   />

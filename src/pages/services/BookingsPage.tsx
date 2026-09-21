@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   BOOKING_STATUS,
@@ -12,7 +13,10 @@ import {
 } from "../../lib/api";
 
 export function BookingsPage() {
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<ServiceBooking> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -21,8 +25,11 @@ export function BookingsPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError("");
       try {
-        const result = await api<PagedResult<ServiceBooking>>(`/admin/service-bookings?page=${page}&pageSize=20`);
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+        if (appliedQuery.trim()) params.set("query", appliedQuery.trim());
+        const result = await api<PagedResult<ServiceBooking>>(`/admin/service-bookings?${params}`);
         if (!cancelled) setData(result);
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "Unable to load bookings");
@@ -34,11 +41,26 @@ export function BookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, pageSize, appliedQuery]);
 
   return (
     <>
-      <PageHeader title="Service bookings" subtitle="Customer booking requests for paid and quote services." />
+      <PageHeader title="Service bookings" subtitle="Search by booking #, service, or customer." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search booking, service, customer…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -67,7 +89,18 @@ export function BookingsPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No service bookings yet." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
     </>
   );
 }

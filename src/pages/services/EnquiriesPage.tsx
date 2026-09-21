@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   ENQUIRY_STATUS,
@@ -11,8 +12,11 @@ import {
 } from "../../lib/api";
 
 export function EnquiriesPage() {
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<Enquiry> | null>(null);
   const [selected, setSelected] = useState<Enquiry | null>(null);
   const [amount, setAmount] = useState("");
@@ -26,8 +30,9 @@ export function EnquiriesPage() {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (status !== "") params.set("status", status);
+      if (appliedQuery.trim()) params.set("query", appliedQuery.trim());
       const result = await api<PagedResult<Enquiry>>(`/admin/enquiries?${params}`);
       setData(result);
     } catch (caught) {
@@ -39,7 +44,7 @@ export function EnquiriesPage() {
 
   useEffect(() => {
     void load();
-  }, [page, status]);
+  }, [page, pageSize, status, appliedQuery]);
 
   async function openEnquiry(id: number) {
     try {
@@ -91,23 +96,37 @@ export function EnquiriesPage() {
 
   return (
     <>
-      <PageHeader title="Enquiries" subtitle="Lead requests with quoting workflow." />
-      <div className="toolbar-row">
-        <select
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">All statuses</option>
-          {Object.entries(ENQUIRY_STATUS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <PageHeader title="Enquiries" subtitle="Search by name, phone, email, or location." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search name, phone, email…"
+        filters={
+          <select
+            value={status}
+            onChange={(e) => {
+              setPage(1);
+              setStatus(e.target.value);
+            }}
+          >
+            <option value="">All statuses</option>
+            {Object.entries(ENQUIRY_STATUS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        }
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setStatus("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -135,7 +154,18 @@ export function EnquiriesPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No enquiries found." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
 
       {selected && (
         <div className="modal-backdrop">
@@ -181,7 +211,13 @@ export function EnquiriesPage() {
               <div className="form-two">
                 <label>
                   Amount
-                  <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                  <input
+                    inputMode="decimal"
+                    min={0}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                  />
                 </label>
                 <label>
                   Details

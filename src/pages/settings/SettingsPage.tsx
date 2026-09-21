@@ -1,9 +1,14 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, type Setting } from "../../lib/api";
 
 export function SettingsPage() {
   const [items, setItems] = useState<Setting[]>([]);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [group, setGroup] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -29,6 +34,14 @@ export function SettingsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.key} ${item.value ?? ""} ${item.group ?? ""}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
 
   async function saveRow(setting: Setting) {
     setSaving(true);
@@ -69,17 +82,33 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle="Key/value configuration for the platform." />
-      <div className="toolbar-row">
-        <input
-          className="search-input"
-          placeholder="Filter by group…"
-          value={group}
-          onChange={(e) => setGroup(e.target.value)}
-        />
-        <button type="button" className="outline-button" onClick={() => void load(group)}>
-          Apply
-        </button>
-      </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search key, value…"
+        filters={
+          <input
+            className="search-input"
+            placeholder="Filter by group…"
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            style={{ maxWidth: 160 }}
+          />
+        }
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+          void load(group);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setGroup("");
+          setPage(1);
+          void load("");
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
+      />
       <ErrorBanner message={error} />
       {message && <div className="success">{message}</div>}
       {loading ? (
@@ -88,28 +117,40 @@ export function SettingsPage() {
         <section className="panel data-table">
           <div className="table-head cols-4">
             <span>Key</span>
-            <span>Group</span>
             <span>Value</span>
+            <span>Group</span>
             <span>Actions</span>
           </div>
-          {items.map((item) => (
-            <div className="table-row cols-4" key={item.id || item.key}>
+          {paged.items.map((item) => (
+            <div className="table-row cols-4" key={item.id}>
               <strong>{item.key}</strong>
-              <span>{item.group || "—"}</span>
               <input
-                value={item.value}
+                value={item.value ?? ""}
                 onChange={(e) =>
-                  setItems((prev) => prev.map((row) => (row.key === item.key ? { ...row, value: e.target.value } : row)))
+                  setItems((prev) =>
+                    prev.map((row) => (row.id === item.id ? { ...row, value: e.target.value } : row)),
+                  )
                 }
               />
-              <button type="button" className="ghost-btn" disabled={saving} onClick={() => void saveRow(item)}>
+              <span>{item.group || "—"}</span>
+              <button type="button" className="primary-button" disabled={saving} onClick={() => void saveRow(item)}>
                 Save
               </button>
             </div>
           ))}
-          {items.length === 0 && <EmptyState message="No settings found." />}
+          {paged.items.length === 0 && <EmptyState message="No settings found." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       <form className="panel form-grid" onSubmit={(e) => void createSetting(e)}>
         <h3 className="span-2">Add setting</h3>

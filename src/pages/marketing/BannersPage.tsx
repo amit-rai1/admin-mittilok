@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, mediaUrl, uploadImage, type Banner } from "../../lib/api";
 
 const blank: Omit<Banner, "id"> = {
@@ -17,6 +19,10 @@ export function BannersPage() {
   const [items, setItems] = useState<Banner[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<Banner>({ id: 0, ...blank });
   const [saving, setSaving] = useState(false);
@@ -26,7 +32,7 @@ export function BannersPage() {
     setLoading(true);
     setError("");
     try {
-      setItems(await api<Banner[]>("/content/banners"));
+      setItems(await api<Banner[]>("/admin/content/banners"));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load banners");
     } finally {
@@ -88,6 +94,14 @@ export function BannersPage() {
     }
   }
 
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.title} ${item.subtitle ?? ""} ${item.buttonLink ?? ""}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
+
   return (
     <>
       <PageHeader
@@ -98,6 +112,21 @@ export function BannersPage() {
             + Add banner
           </button>
         }
+      />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search banners…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
       />
       <ErrorBanner message={error} />
       {loading ? (
@@ -111,7 +140,7 @@ export function BannersPage() {
             <span>Status</span>
             <span>Actions</span>
           </div>
-          {items.map((item) => (
+          {paged.items.map((item) => (
             <div className="table-row cols-5" key={item.id}>
               <div className="thumb-cell">
                 {item.image ? <img src={mediaUrl(item.image)} alt="" /> : <span className="thumb-placeholder">—</span>}
@@ -133,9 +162,19 @@ export function BannersPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 && <EmptyState message="No banners yet." />}
+          {paged.items.length === 0 && <EmptyState message="No banners yet." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -149,6 +188,7 @@ export function BannersPage() {
                 ×
               </button>
             </div>
+            <ErrorBanner message={error} />
             <label>
               Title
               <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
@@ -195,10 +235,10 @@ export function BannersPage() {
             </label>
             <label>
               Display order
-              <input
-                type="number"
+              <NumberField
                 value={form.displayOrder}
-                onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
+                onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                allowDecimal={false}
               />
             </label>
             <label className="check-row">

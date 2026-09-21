@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   formatMoney,
@@ -26,6 +28,7 @@ export function ServicesPage() {
   const [data, setData] = useState<PagedResult<ServiceItem> | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ export function ServicesPage() {
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ page: String(nextPage), pageSize: "20" });
+      const params = new URLSearchParams({ page: String(nextPage), pageSize: String(pageSize) });
       if (nextQuery.trim()) params.set("query", nextQuery.trim());
       const [services, cats] = await Promise.all([
         api<PagedResult<ServiceItem>>(`/services?${params}`),
@@ -55,7 +58,7 @@ export function ServicesPage() {
 
   useEffect(() => {
     void load();
-  }, [page]);
+  }, [page, pageSize]);
 
   function openCreate() {
     setEditing(null);
@@ -82,15 +85,24 @@ export function ServicesPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.name.trim()) {
+      setError("Service name is required.");
+      return;
+    }
+    if (!form.categoryId) {
+      setError("Category is required.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       if (editing) {
-        await api(`/admin/services/${editing.id}`, { method: "PUT", body: { ...editing, ...form } });
+        await api(`/admin/services/${editing.id}`, { method: "PUT", body: { ...editing, ...form, id: editing.id } });
       } else {
         await api("/admin/services", { method: "POST", body: form });
       }
       setFormOpen(false);
+      setEditing(null);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save service");
@@ -120,30 +132,21 @@ export function ServicesPage() {
           </button>
         }
       />
-      <div className="toolbar-row">
-        <input
-          className="search-input"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search services…"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              setPage(1);
-              void load(1, query);
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="outline-button"
-          onClick={() => {
-            setPage(1);
-            void load(1, query);
-          }}
-        >
-          Search
-        </button>
-      </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search services…"
+        onApply={() => {
+          setPage(1);
+          void load(1, query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setPage(1);
+          void load(1, "");
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -178,7 +181,18 @@ export function ServicesPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No services found." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -192,6 +206,7 @@ export function ServicesPage() {
                 ×
               </button>
             </div>
+            <ErrorBanner message={error} />
             <label>
               Name
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -213,7 +228,11 @@ export function ServicesPage() {
             <div className="form-two">
               <label>
                 Base price
-                <input type="number" min={0} value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) })} />
+                <NumberField
+                  min={0}
+                  value={form.basePrice}
+                  onChange={(n) => setForm({ ...form, basePrice: n ?? 0 })}
+                />
               </label>
               <label>
                 Pricing type

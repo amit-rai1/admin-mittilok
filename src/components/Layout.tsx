@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { NotificationBell } from "./NotificationBell";
+import { PAGE_SIZE_OPTIONS } from "../lib/listPaging";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -222,7 +223,12 @@ export function EmptyState({ message }: { message: string }) {
 }
 
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
-  return <div className="loading-state">{label}</div>;
+  return (
+    <div className="loading-state" role="status" aria-live="polite">
+      <span className="loading-spinner" aria-hidden />
+      <span>{label}</span>
+    </div>
+  );
 }
 
 export function ErrorBanner({ message }: { message: string }) {
@@ -230,21 +236,84 @@ export function ErrorBanner({ message }: { message: string }) {
   return <div className="alert">{message}</div>;
 }
 
+export function ListToolbar({
+  query,
+  onQueryChange,
+  onApply,
+  onClear,
+  placeholder = "Search…",
+  filters,
+  resultLabel,
+  applying,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  onApply: () => void;
+  onClear?: () => void;
+  placeholder?: string;
+  filters?: ReactNode;
+  resultLabel?: string;
+  applying?: boolean;
+}) {
+  return (
+    <div className="list-toolbar">
+      <div className="list-toolbar-main">
+        <input
+          className="search-input"
+          placeholder={placeholder}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onApply();
+          }}
+        />
+        {filters}
+        <button type="button" className="primary-button" disabled={applying} onClick={onApply}>
+          Apply
+        </button>
+        {onClear && (
+          <button type="button" className="outline-button" disabled={applying} onClick={onClear}>
+            Clear
+          </button>
+        )}
+      </div>
+      {resultLabel && <p className="list-toolbar-count muted">{resultLabel}</p>}
+    </div>
+  );
+}
+
 export function Pagination({
   page,
   pageSize,
   totalCount,
   onChange,
+  onPageSizeChange,
 }: {
   page: number;
   pageSize: number;
   totalCount: number;
   onChange: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }) {
+  if (totalCount <= 0) return null;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  if (totalCount <= pageSize) return null;
   return (
     <div className="pagination">
+      {onPageSizeChange && (
+        <label className="pagination-size">
+          Rows
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)}>
         Previous
       </button>

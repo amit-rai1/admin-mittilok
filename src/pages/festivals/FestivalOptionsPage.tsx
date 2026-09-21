@@ -1,5 +1,7 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, formatMoney, mediaUrl, uploadImage } from "../../lib/api";
 
 type Pot = {
@@ -24,19 +26,34 @@ type Addon = {
   displayOrder: number;
 };
 
-const blankPot: Pot = { id: 0, name: "", material: "", colour: "", image: "", priceDelta: 0, stock: 100, isActive: true, displayOrder: 0 };
-const blankAddon: Addon = { id: 0, name: "", description: "", image: "", price: 0, isActive: true, displayOrder: 0 };
+type Tab = "pots" | "addons";
 
-const thumbStyle: CSSProperties = { width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 };
-const placeholderStyle: CSSProperties = {
-  ...thumbStyle,
-  background: "#e8ebe9",
-  display: "inline-block",
+const blankPot: Pot = {
+  id: 0,
+  name: "",
+  material: "",
+  colour: "",
+  image: "",
+  priceDelta: 0,
+  stock: 100,
+  isActive: true,
+  displayOrder: 0,
+};
+const blankAddon: Addon = {
+  id: 0,
+  name: "",
+  description: "",
+  image: "",
+  price: 0,
+  isActive: true,
+  displayOrder: 0,
 };
 
 function OptionThumb({ image, alt }: { image?: string | null; alt: string }) {
-  if (image) return <img src={mediaUrl(image)} alt={alt} style={thumbStyle} />;
-  return <span style={placeholderStyle} aria-hidden />;
+  if (image) return <img src={mediaUrl(image)} alt={alt} />;
+  return <span className="thumb-placeholder" aria-hidden>
+    —
+  </span>;
 }
 
 function ImageField({
@@ -51,21 +68,25 @@ function ImageField({
   onClear: () => void;
 }) {
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className="image-field">
       <label>
         Image
-        <input type="file" accept="image/*" disabled={uploading} onChange={(e) => onUpload(e.target.files?.[0] ?? null)} />
+        <input
+          type="file"
+          accept="image/*"
+          disabled={uploading}
+          onChange={(e) => onUpload(e.target.files?.[0] ?? null)}
+        />
       </label>
-      {uploading ? <small>Uploading…</small> : null}
+      {uploading ? <small className="muted">Uploading…</small> : null}
       {image ? (
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <img src={mediaUrl(image)} alt="Current" style={{ width: 96, height: 96, borderRadius: 8, objectFit: "cover" }} />
-          <div style={{ display: "grid", gap: 6 }}>
-            <small>Current image</small>
-            <button type="button" onClick={onClear}>
-              Remove image
-            </button>
+        <div className="image-field-preview">
+          <div className="thumb-cell large">
+            <img src={mediaUrl(image)} alt="Current" />
           </div>
+          <button type="button" className="outline-button" onClick={onClear}>
+            Remove image
+          </button>
         </div>
       ) : null}
     </div>
@@ -77,6 +98,11 @@ export function FestivalOptionsPage() {
   const [addons, setAddons] = useState<Addon[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("pots");
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [potForm, setPotForm] = useState<Pot | null>(null);
   const [addonForm, setAddonForm] = useState<Addon | null>(null);
   const [saving, setSaving] = useState(false);
@@ -103,6 +129,11 @@ export function FestivalOptionsPage() {
     void load();
   }, []);
 
+  function switchTab(next: Tab) {
+    setTab(next);
+    setPage(1);
+  }
+
   function openPotForm(pot: Pot) {
     setAddonForm(null);
     setPotForm(pot);
@@ -113,13 +144,23 @@ export function FestivalOptionsPage() {
     setAddonForm(addon);
   }
 
+  function closeForms() {
+    setPotForm(null);
+    setAddonForm(null);
+  }
+
   async function savePot(event: FormEvent) {
     event.preventDefault();
     if (!potForm) return;
+    if (!potForm.name.trim()) {
+      setError("Pot name is required.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
       await api("/admin/festivals/pots", { method: "POST", body: potForm });
-      setPotForm(null);
+      closeForms();
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save pot");
@@ -131,10 +172,15 @@ export function FestivalOptionsPage() {
   async function saveAddon(event: FormEvent) {
     event.preventDefault();
     if (!addonForm) return;
+    if (!addonForm.name.trim()) {
+      setError("Add-on name is required.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
       await api("/admin/festivals/addons", { method: "POST", body: addonForm });
-      setAddonForm(null);
+      closeForms();
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save add-on");
@@ -146,6 +192,7 @@ export function FestivalOptionsPage() {
   async function upload(file: File | null, kind: "pot" | "addon") {
     if (!file) return;
     setUploading(true);
+    setError("");
     try {
       const uploaded = await uploadImage(file, "festivals");
       const path = uploaded.path || uploaded.url;
@@ -158,140 +205,300 @@ export function FestivalOptionsPage() {
     }
   }
 
+  async function deletePot(id: number) {
+    if (!window.confirm("Delete this pot?")) return;
+    setError("");
+    try {
+      await api(`/admin/festivals/pots/${id}`, { method: "DELETE" });
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to delete pot");
+    }
+  }
+
+  async function deleteAddon(id: number) {
+    if (!window.confirm("Delete this add-on?")) return;
+    setError("");
+    try {
+      await api(`/admin/festivals/addons/${id}`, { method: "DELETE" });
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to delete add-on");
+    }
+  }
+
+  const pagedPots = useMemo(
+    () =>
+      paginateLocal(pots, page, pageSize, appliedQuery, (item, q) =>
+        `${item.name} ${item.material ?? ""} ${item.colour ?? ""}`.toLowerCase().includes(q),
+      ),
+    [pots, page, pageSize, appliedQuery],
+  );
+
+  const pagedAddons = useMemo(
+    () =>
+      paginateLocal(addons, page, pageSize, appliedQuery, (item, q) =>
+        `${item.name} ${item.description ?? ""}`.toLowerCase().includes(q),
+      ),
+    [addons, page, pageSize, appliedQuery],
+  );
+
+  const activePaged = tab === "pots" ? pagedPots : pagedAddons;
+
   return (
     <>
-      <PageHeader title="Pots & add-ons" subtitle="Shared options for all festival campaigns." />
+      <PageHeader
+        title="Pots & add-ons"
+        subtitle="Shared options for all festival campaigns."
+        actions={
+          tab === "pots" ? (
+            <button type="button" className="primary-button" onClick={() => openPotForm({ ...blankPot })}>
+              + Pot
+            </button>
+          ) : (
+            <button type="button" className="primary-button" onClick={() => openAddonForm({ ...blankAddon })}>
+              + Add-on
+            </button>
+          )
+        }
+      />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder={tab === "pots" ? "Search pots…" : "Search add-ons…"}
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(activePaged.page, activePaged.pageSize, activePaged.totalCount)}
+      />
+
+      <div className="list-tabs" role="tablist" aria-label="Option type">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "pots"}
+          className={`list-tab${tab === "pots" ? " active" : ""}`}
+          onClick={() => switchTab("pots")}
+        >
+          Pots ({pagedPots.totalCount})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "addons"}
+          className={`list-tab${tab === "addons" ? " active" : ""}`}
+          onClick={() => switchTab("addons")}
+        >
+          Add-ons ({pagedAddons.totalCount})
+        </button>
+      </div>
+
       <ErrorBanner message={error} />
+
       {loading ? (
         <LoadingState />
-      ) : (
-        <div className="split-panels" style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
-          <section className="panel">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2>Pots</h2>
-              <button type="button" className="primary-button" onClick={() => openPotForm({ ...blankPot })}>
-                + Pot
-              </button>
-            </div>
-            {pots.map((p) => (
-              <div key={p.id} className="table-row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 0" }}>
+      ) : tab === "pots" ? (
+        <section className="panel data-table">
+          <div className="table-head cols-4">
+            <span>Item</span>
+            <span>Price / stock</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+          {pagedPots.items.map((p) => (
+            <div key={p.id} className="table-row cols-4">
+              <div className="thumb-cell with-label">
                 <OptionThumb image={p.image} alt={p.name} />
-                <div style={{ flex: 1 }}>
+                <div>
                   <strong>{p.name}</strong>
-                  <small>
-                    {formatMoney(p.priceDelta)} delta · stock {p.stock} · {p.isActive ? "Active" : "Off"}
-                  </small>
+                  <small>{[p.material, p.colour].filter(Boolean).join(" · ") || "—"}</small>
                 </div>
-                <button type="button" onClick={() => openPotForm(p)}>
+              </div>
+              <span>
+                {formatMoney(p.priceDelta)} · stock {p.stock}
+              </span>
+              <span>{p.isActive ? "Active" : "Off"}</span>
+              <div className="row-actions">
+                <button type="button" className="ghost-btn" onClick={() => openPotForm(p)}>
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm("Delete pot?")) void api(`/admin/festivals/pots/${p.id}`, { method: "DELETE" }).then(load);
-                  }}
-                >
+                <button type="button" className="row-action" onClick={() => void deletePot(p.id)}>
                   Delete
                 </button>
               </div>
-            ))}
-            {pots.length === 0 && <EmptyState message="No pots yet." />}
-          </section>
-
-          <section className="panel">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2>Add-ons</h2>
-              <button type="button" className="primary-button" onClick={() => openAddonForm({ ...blankAddon })}>
-                + Add-on
-              </button>
             </div>
-            {addons.map((a) => (
-              <div key={a.id} className="table-row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 0" }}>
+          ))}
+          {pagedPots.items.length === 0 && <EmptyState message="No pots yet." />}
+        </section>
+      ) : (
+        <section className="panel data-table">
+          <div className="table-head cols-4">
+            <span>Item</span>
+            <span>Price</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+          {pagedAddons.items.map((a) => (
+            <div key={a.id} className="table-row cols-4">
+              <div className="thumb-cell with-label">
                 <OptionThumb image={a.image} alt={a.name} />
-                <div style={{ flex: 1 }}>
+                <div>
                   <strong>{a.name}</strong>
-                  <small>
-                    {formatMoney(a.price)} · {a.isActive ? "Active" : "Off"}
-                  </small>
+                  <small>{a.description || "—"}</small>
                 </div>
-                <button type="button" onClick={() => openAddonForm(a)}>
+              </div>
+              <span>{formatMoney(a.price)}</span>
+              <span>{a.isActive ? "Active" : "Off"}</span>
+              <div className="row-actions">
+                <button type="button" className="ghost-btn" onClick={() => openAddonForm(a)}>
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm("Delete add-on?")) void api(`/admin/festivals/addons/${a.id}`, { method: "DELETE" }).then(load);
-                  }}
-                >
+                <button type="button" className="row-action" onClick={() => void deleteAddon(a.id)}>
                   Delete
                 </button>
               </div>
-            ))}
-            {addons.length === 0 && <EmptyState message="No add-ons yet." />}
-          </section>
-        </div>
+            </div>
+          ))}
+          {pagedAddons.items.length === 0 && <EmptyState message="No add-ons yet." />}
+        </section>
       )}
 
+      <Pagination
+        page={activePaged.page}
+        pageSize={activePaged.pageSize}
+        totalCount={activePaged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
+
       {potForm && (
-        <div className="drawer-backdrop" onClick={() => setPotForm(null)}>
-          <form className="side-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void savePot(e)}>
-            <h2>{potForm.id ? "Edit pot" : "New pot"}</h2>
+        <div className="modal-backdrop" onClick={closeForms}>
+          <form
+            className="modal panel"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => void savePot(e)}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">{potForm.id ? "Edit" : "Create"}</p>
+                <h3>{potForm.id ? "Update pot" : "New pot"}</h3>
+              </div>
+              <button type="button" className="icon-only" onClick={closeForms}>
+                ×
+              </button>
+            </div>
+            <ErrorBanner message={error} />
             <label>
-              Name
-              <input required value={potForm.name} onChange={(e) => setPotForm({ ...potForm, name: e.target.value })} />
+              Name *
+              <input
+                required
+                value={potForm.name}
+                onChange={(e) => setPotForm({ ...potForm, name: e.target.value })}
+              />
             </label>
-            <label>
-              Material
-              <input value={potForm.material ?? ""} onChange={(e) => setPotForm({ ...potForm, material: e.target.value })} />
-            </label>
-            <label>
-              Colour
-              <input value={potForm.colour ?? ""} onChange={(e) => setPotForm({ ...potForm, colour: e.target.value })} />
-            </label>
-            <label>
-              Price delta
-              <input type="number" value={potForm.priceDelta} onChange={(e) => setPotForm({ ...potForm, priceDelta: Number(e.target.value) })} />
-            </label>
-            <label>
-              Stock
-              <input type="number" value={potForm.stock} onChange={(e) => setPotForm({ ...potForm, stock: Number(e.target.value) })} />
-            </label>
+            <div className="form-two">
+              <label>
+                Material
+                <input
+                  value={potForm.material ?? ""}
+                  onChange={(e) => setPotForm({ ...potForm, material: e.target.value })}
+                />
+              </label>
+              <label>
+                Colour
+                <input
+                  value={potForm.colour ?? ""}
+                  onChange={(e) => setPotForm({ ...potForm, colour: e.target.value })}
+                />
+              </label>
+            </div>
+            <div className="form-two">
+              <label>
+                Price delta
+                <NumberField
+                  value={potForm.priceDelta}
+                  onChange={(n) => setPotForm({ ...potForm, priceDelta: n ?? 0 })}
+                  allowNegative
+                />
+              </label>
+              <label>
+                Stock
+                <NumberField
+                  value={potForm.stock}
+                  onChange={(n) => setPotForm({ ...potForm, stock: n ?? 0 })}
+                  allowDecimal={false}
+                />
+              </label>
+            </div>
             <ImageField
               image={potForm.image}
               uploading={uploading}
               onUpload={(file) => void upload(file, "pot")}
               onClear={() => setPotForm({ ...potForm, image: "" })}
             />
-            <label>
-              <input type="checkbox" checked={potForm.isActive} onChange={(e) => setPotForm({ ...potForm, isActive: e.target.checked })} /> Active
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={potForm.isActive}
+                onChange={(e) => setPotForm({ ...potForm, isActive: e.target.checked })}
+              />
+              Active
             </label>
-            <div className="sheet-actions">
-              <button type="button" onClick={() => setPotForm(null)}>
-                Cancel
-              </button>
-              <button className="primary-button" disabled={saving || uploading}>
-                Save
-              </button>
-            </div>
+            <button className="primary-button" disabled={saving || uploading}>
+              {saving ? "Saving…" : uploading ? "Uploading…" : "Save pot"}
+            </button>
           </form>
         </div>
       )}
 
       {addonForm && (
-        <div className="drawer-backdrop" onClick={() => setAddonForm(null)}>
-          <form className="side-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void saveAddon(e)}>
-            <h2>{addonForm.id ? "Edit add-on" : "New add-on"}</h2>
+        <div className="modal-backdrop" onClick={closeForms}>
+          <form
+            className="modal panel"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => void saveAddon(e)}
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">{addonForm.id ? "Edit" : "Create"}</p>
+                <h3>{addonForm.id ? "Update add-on" : "New add-on"}</h3>
+              </div>
+              <button type="button" className="icon-only" onClick={closeForms}>
+                ×
+              </button>
+            </div>
+            <ErrorBanner message={error} />
             <label>
-              Name
-              <input required value={addonForm.name} onChange={(e) => setAddonForm({ ...addonForm, name: e.target.value })} />
+              Name *
+              <input
+                required
+                value={addonForm.name}
+                onChange={(e) => setAddonForm({ ...addonForm, name: e.target.value })}
+              />
             </label>
             <label>
               Description
-              <textarea value={addonForm.description ?? ""} onChange={(e) => setAddonForm({ ...addonForm, description: e.target.value })} />
+              <textarea
+                rows={3}
+                value={addonForm.description ?? ""}
+                onChange={(e) => setAddonForm({ ...addonForm, description: e.target.value })}
+              />
             </label>
             <label>
               Price
-              <input type="number" value={addonForm.price} onChange={(e) => setAddonForm({ ...addonForm, price: Number(e.target.value) })} />
+              <NumberField
+                value={addonForm.price}
+                onChange={(n) => setAddonForm({ ...addonForm, price: n ?? 0 })}
+              />
             </label>
             <ImageField
               image={addonForm.image}
@@ -299,17 +506,17 @@ export function FestivalOptionsPage() {
               onUpload={(file) => void upload(file, "addon")}
               onClear={() => setAddonForm({ ...addonForm, image: "" })}
             />
-            <label>
-              <input type="checkbox" checked={addonForm.isActive} onChange={(e) => setAddonForm({ ...addonForm, isActive: e.target.checked })} /> Active
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={addonForm.isActive}
+                onChange={(e) => setAddonForm({ ...addonForm, isActive: e.target.checked })}
+              />
+              Active
             </label>
-            <div className="sheet-actions">
-              <button type="button" onClick={() => setAddonForm(null)}>
-                Cancel
-              </button>
-              <button className="primary-button" disabled={saving || uploading}>
-                Save
-              </button>
-            </div>
+            <button className="primary-button" disabled={saving || uploading}>
+              {saving ? "Saving…" : uploading ? "Uploading…" : "Save add-on"}
+            </button>
           </form>
         </div>
       )}

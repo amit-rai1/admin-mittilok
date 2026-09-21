@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import { api, formatDate, formatMoney, mediaUrl, statusClass, type PagedResult } from "../../lib/api";
 
 type AddonImage = { name: string; image?: string | null };
@@ -115,7 +116,10 @@ function Thumb({ src, alt, size = 48 }: { src?: string | null; alt: string; size
 export function FestivalBookingsPage() {
   const [params] = useSearchParams();
   const campaignId = params.get("campaignId");
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<FestivalBooking> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -126,8 +130,9 @@ export function FestivalBookingsPage() {
   async function load() {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ page: String(page), pageSize: "20" });
+      const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (campaignId) qs.set("campaignId", campaignId);
+      if (appliedQuery.trim()) qs.set("query", appliedQuery.trim());
       setData(await api<PagedResult<FestivalBooking>>(`/admin/festivals/bookings?${qs}`));
       setError("");
     } catch (caught) {
@@ -139,7 +144,7 @@ export function FestivalBookingsPage() {
 
   useEffect(() => {
     void load();
-  }, [page, campaignId]);
+  }, [page, pageSize, campaignId, appliedQuery]);
 
   async function openDetail(id: number) {
     setDetailLoading(true);
@@ -172,7 +177,22 @@ export function FestivalBookingsPage() {
 
   return (
     <>
-      <PageHeader title="Festival bookings" subtitle="Pre-bookings, advance paid, and balance due." />
+      <PageHeader title="Festival bookings" subtitle="Search by booking #, customer, or festival." />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search booking #, customer, phone…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -243,7 +263,18 @@ export function FestivalBookingsPage() {
           {(data?.items.length ?? 0) === 0 && <EmptyState message="No festival bookings yet." />}
         </section>
       )}
-      {data && <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
+      )}
 
       {(detail || detailLoading) && (
         <div className="drawer-backdrop" onClick={() => !detailLoading && setDetail(null)}>

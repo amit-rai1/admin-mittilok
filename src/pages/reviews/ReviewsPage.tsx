@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   formatDate,
@@ -12,12 +13,13 @@ import {
 export function ReviewsPage() {
   const [productId, setProductId] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [data, setData] = useState<PagedResult<Review> | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadedOnce, setLoadedOnce] = useState(false);
 
-  async function load(nextPage = page) {
+  async function load(nextPage = page, nextSize = pageSize) {
     if (!productId.trim()) {
       setError("Enter a product ID to load reviews.");
       return;
@@ -26,7 +28,7 @@ export function ReviewsPage() {
     setError("");
     try {
       const result = await api<PagedResult<Review>>(
-        `/reviews/product/${productId.trim()}?page=${nextPage}&pageSize=20`,
+        `/reviews/product/${productId.trim()}?page=${nextPage}&pageSize=${nextSize}`,
       );
       setData(result);
       setLoadedOnce(true);
@@ -108,11 +110,16 @@ export function ReviewsPage() {
       {data && (
         <Pagination
           page={data.page}
-          pageSize={data.pageSize}
+          pageSize={pageSize}
           totalCount={data.totalCount}
           onChange={(next) => {
             setPage(next);
             void load(next);
+          }}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+            void load(1, size);
           }}
         />
       )}

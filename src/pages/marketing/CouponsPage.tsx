@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { NumberField } from "../../components/NumberField";
+import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPaging";
 import { api, DISCOUNT_TYPE, formatDate, formatMoney, type Coupon } from "../../lib/api";
 
 const blank: Omit<Coupon, "id"> = {
@@ -19,6 +21,10 @@ export function CouponsPage() {
   const [items, setItems] = useState<Coupon[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Coupon | null>(null);
   const [form, setForm] = useState(blank);
@@ -58,6 +64,18 @@ export function CouponsPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.code.trim() || !form.name.trim()) {
+      setError("Code and name are required.");
+      return;
+    }
+    if (form.discountType === 0 && (form.percentage == null || form.percentage <= 0)) {
+      setError("Enter a percentage greater than 0.");
+      return;
+    }
+    if (form.discountType === 1 && (form.fixedAmount == null || form.fixedAmount <= 0)) {
+      setError("Enter a fixed amount greater than 0.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -67,6 +85,7 @@ export function CouponsPage() {
         endDate: new Date(form.endDate).toISOString(),
         percentage: form.discountType === 0 ? form.percentage : null,
         fixedAmount: form.discountType === 1 ? form.fixedAmount : null,
+        minimumOrder: form.minimumOrder && form.minimumOrder > 0 ? form.minimumOrder : null,
       };
       if (editing) {
         await api(`/admin/coupons/${editing.id}`, { method: "PUT", body: { ...payload, id: editing.id } });
@@ -74,6 +93,7 @@ export function CouponsPage() {
         await api("/admin/coupons", { method: "POST", body: payload });
       }
       setFormOpen(false);
+      setEditing(null);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save coupon");
@@ -92,6 +112,14 @@ export function CouponsPage() {
     }
   }
 
+  const paged = useMemo(
+    () =>
+      paginateLocal(items, page, pageSize, appliedQuery, (item, q) =>
+        `${item.code} ${item.name}`.toLowerCase().includes(q),
+      ),
+    [items, page, pageSize, appliedQuery],
+  );
+
   return (
     <>
       <PageHeader
@@ -102,6 +130,21 @@ export function CouponsPage() {
             + Add coupon
           </button>
         }
+      />
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search code or name…"
+        onApply={() => {
+          setPage(1);
+          setAppliedQuery(query);
+        }}
+        onClear={() => {
+          setQuery("");
+          setAppliedQuery("");
+          setPage(1);
+        }}
+        resultLabel={resultRange(paged.page, paged.pageSize, paged.totalCount)}
       />
       <ErrorBanner message={error} />
       {loading ? (
@@ -116,7 +159,7 @@ export function CouponsPage() {
             <span>Status</span>
             <span>Actions</span>
           </div>
-          {items.map((item) => (
+          {paged.items.map((item) => (
             <div className="table-row cols-6" key={item.id}>
               <strong>{item.code}</strong>
               <span>{item.name}</span>
@@ -139,9 +182,19 @@ export function CouponsPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 && <EmptyState message="No coupons yet." />}
+          {paged.items.length === 0 && <EmptyState message="No coupons yet." />}
         </section>
       )}
+      <Pagination
+        page={paged.page}
+        pageSize={paged.pageSize}
+        totalCount={paged.totalCount}
+        onChange={setPage}
+        onPageSizeChange={(size) => {
+          setPage(1);
+          setPageSize(size);
+        }}
+      />
 
       {formOpen && (
         <div className="modal-backdrop">
@@ -155,6 +208,7 @@ export function CouponsPage() {
                 ×
               </button>
             </div>
+            <ErrorBanner message={error} />
             <label>
               Code
               <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required />
@@ -176,38 +230,28 @@ export function CouponsPage() {
             {form.discountType === 0 ? (
               <label>
                 Percentage
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.percentage ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, percentage: e.target.value === "" ? null : Number(e.target.value) })
-                  }
+                <NumberField
+                  nullable
+                  value={form.percentage}
+                  onChange={(n) => setForm({ ...form, percentage: n })}
                 />
               </label>
             ) : (
               <label>
                 Fixed amount
-                <input
-                  type="number"
-                  min={0}
-                  value={form.fixedAmount ?? ""}
-                  onChange={(e) =>
-                    setForm({ ...form, fixedAmount: e.target.value === "" ? null : Number(e.target.value) })
-                  }
+                <NumberField
+                  nullable
+                  value={form.fixedAmount}
+                  onChange={(n) => setForm({ ...form, fixedAmount: n })}
                 />
               </label>
             )}
             <label>
               Minimum order
-              <input
-                type="number"
-                min={0}
-                value={form.minimumOrder || ""}
-                onChange={(e) =>
-                  setForm({ ...form, minimumOrder: e.target.value === "" ? 0 : Number(e.target.value) })
-                }
+              <NumberField
+                nullable
+                value={form.minimumOrder}
+                onChange={(n) => setForm({ ...form, minimumOrder: n })}
               />
             </label>
             <div className="form-two">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { EmptyState, ErrorBanner, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
+import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   formatMoney,
@@ -21,6 +22,7 @@ export function ProductsPage() {
   const [status, setStatus] = useState("");
   const [stock, setStock] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [roots, setRoots] = useState<Category[]>([]);
   const [subs, setSubs] = useState<Category[]>([]);
   const [data, setData] = useState<PagedResult<ProductListItem> | null>(null);
@@ -52,7 +54,7 @@ export function ProductsPage() {
     try {
       const params = new URLSearchParams({
         page: String(nextPage),
-        pageSize: "20",
+        pageSize: String(pageSize),
         includeDrafts: "true",
       });
       if (query.trim()) params.set("query", query.trim());
@@ -70,7 +72,7 @@ export function ProductsPage() {
 
   useEffect(() => {
     void load(page);
-  }, [page]);
+  }, [page, pageSize]);
 
   function applyFilters() {
     setPage(1);
@@ -171,53 +173,55 @@ export function ProductsPage() {
           </Link>
         }
       />
-      <div className="toolbar-row filters-wrap">
-        <input
-          className="search-input"
-          placeholder="Search products…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") applyFilters();
-          }}
-        />
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">All categories</option>
-          {roots.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={subCategoryId}
-          onChange={(e) => setSubCategoryId(e.target.value ? Number(e.target.value) : "")}
-          disabled={!categoryId}
-        >
-          <option value="">All subcategories</option>
-          {subs.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="Draft">Draft</option>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-          <option value="OutOfStock">Out of stock</option>
-        </select>
-        <select value={stock} onChange={(e) => setStock(e.target.value)}>
-          <option value="">All stock</option>
-          <option value="instock">In stock</option>
-          <option value="lowstock">Low stock</option>
-          <option value="outofstock">Out of stock</option>
-        </select>
-        <button type="button" className="outline-button" onClick={applyFilters}>
-          Apply
-        </button>
-      </div>
+      <ListToolbar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="Search products…"
+        filters={
+          <>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">All categories</option>
+              {roots.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select
+              value={subCategoryId}
+              onChange={(e) => setSubCategoryId(e.target.value ? Number(e.target.value) : "")}
+              disabled={!categoryId}
+            >
+              <option value="">All subcategories</option>
+              {subs.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="OutOfStock">Out of stock</option>
+            </select>
+            <select value={stock} onChange={(e) => setStock(e.target.value)}>
+              <option value="">All stock</option>
+              <option value="instock">In stock</option>
+              <option value="lowstock">Low stock</option>
+              <option value="outofstock">Out of stock</option>
+            </select>
+          </>
+        }
+        onApply={applyFilters}
+        onClear={() => {
+          setQuery("");
+          setCategoryId("");
+          setSubCategoryId("");
+          setStatus("");
+          setStock("");
+          setPage(1);
+          void load(1);
+        }}
+        resultLabel={data ? resultRange(data.page, data.pageSize, data.totalCount) : undefined}
+      />
       <ErrorBanner message={error} />
       {loading ? (
         <LoadingState />
@@ -290,7 +294,16 @@ export function ProductsPage() {
         </section>
       )}
       {data && (
-        <Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onChange={setPage} />
+        <Pagination
+          page={data.page}
+          pageSize={pageSize}
+          totalCount={data.totalCount}
+          onChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1);
+            setPageSize(size);
+          }}
+        />
       )}
     </>
   );
