@@ -106,7 +106,7 @@ export function BannersPage() {
     <>
       <PageHeader
         title="Banners"
-        subtitle="Homepage and campaign banners."
+        subtitle="Homepage hero slides. Upload a wide desktop image and an optional taller mobile image."
         actions={
           <button type="button" className="primary-button" onClick={openCreate}>
             + Add banner
@@ -198,7 +198,8 @@ export function BannersPage() {
               <input value={form.subtitle ?? ""} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} />
             </label>
             <label>
-              Image
+              Desktop / tablet image *
+              <small className="muted">Recommended 1920×800 px (wide ~12:5). Used above 768px width.</small>
               <input
                 type="file"
                 accept="image/*"
@@ -213,6 +214,7 @@ export function BannersPage() {
             )}
             <label>
               Mobile image (optional)
+              <small className="muted">Recommended 1080×1350 px (portrait ~4:5). Used at ≤768px; falls back to desktop image if empty.</small>
               <input
                 type="file"
                 accept="image/*"
