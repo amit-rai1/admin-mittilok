@@ -492,18 +492,28 @@ export function FestivalCampaignsPage() {
       />
 
       {formOpen && (
-        <div className="drawer-backdrop" onClick={() => setFormOpen(false)}>
-          <form className="side-drawer" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void onSubmit(e)}>
-            <h2>{form.id ? "Edit festival" : "New festival"}</h2>
+        <div className="modal-backdrop" onClick={() => setFormOpen(false)}>
+          <form className="modal panel wide" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void onSubmit(e)}>
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">{form.id ? "Edit" : "Create"}</p>
+                <h3>{form.id ? "Update festival" : "New festival"}</h3>
+              </div>
+              <button type="button" className="icon-only" onClick={() => setFormOpen(false)} aria-label="Close">
+                ×
+              </button>
+            </div>
             <ErrorBanner message={error} />
-            <label>
-              Name
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </label>
-            <label>
-              Slug
-              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto from name" />
-            </label>
+            <div className="form-two">
+              <label>
+                Name
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </label>
+              <label>
+                Slug
+                <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto from name" />
+              </label>
+            </div>
             <label>
               Offer strip
               <input value={form.offerStrip ?? ""} onChange={(e) => setForm({ ...form, offerStrip: e.target.value })} />
@@ -517,30 +527,42 @@ export function FestivalCampaignsPage() {
               <input type="file" accept="image/*" onChange={(e) => void onUpload(e.target.files?.[0] ?? null)} />
             </label>
             {form.banner ? <img src={mediaUrl(form.banner)} alt="" style={{ maxWidth: "100%", borderRadius: 8 }} /> : null}
-            <label>
-              Booking start
-              <input type="datetime-local" required value={form.bookingStart} onChange={(e) => setForm({ ...form, bookingStart: e.target.value })} />
-            </label>
-            <label>
-              Booking end
-              <input type="datetime-local" required value={form.bookingEnd} onChange={(e) => setForm({ ...form, bookingEnd: e.target.value })} />
-            </label>
-            <label>
-              Delivery start
-              <input type="datetime-local" value={form.deliveryStart ?? ""} onChange={(e) => setForm({ ...form, deliveryStart: e.target.value })} />
-            </label>
-            <label>
-              Delivery end
-              <input type="datetime-local" value={form.deliveryEnd ?? ""} onChange={(e) => setForm({ ...form, deliveryEnd: e.target.value })} />
-            </label>
-            <label>
-              Advance %
-              <NumberField
-                value={form.advancePercent}
-                onChange={(n) => setForm({ ...form, advancePercent: n ?? 0 })}
-                allowDecimal={false}
-              />
-            </label>
+            <div className="form-two">
+              <label>
+                Booking start
+                <input type="datetime-local" required value={form.bookingStart} onChange={(e) => setForm({ ...form, bookingStart: e.target.value })} />
+              </label>
+              <label>
+                Booking end
+                <input type="datetime-local" required value={form.bookingEnd} onChange={(e) => setForm({ ...form, bookingEnd: e.target.value })} />
+              </label>
+              <label>
+                Delivery start
+                <input type="datetime-local" value={form.deliveryStart ?? ""} onChange={(e) => setForm({ ...form, deliveryStart: e.target.value })} />
+              </label>
+              <label>
+                Delivery end
+                <input type="datetime-local" value={form.deliveryEnd ?? ""} onChange={(e) => setForm({ ...form, deliveryEnd: e.target.value })} />
+              </label>
+            </div>
+            <div className="form-two">
+              <label>
+                Advance %
+                <NumberField
+                  value={form.advancePercent}
+                  onChange={(n) => setForm({ ...form, advancePercent: n ?? 0 })}
+                  allowDecimal={false}
+                />
+              </label>
+              <label>
+                Display order
+                <NumberField
+                  value={form.displayOrder}
+                  onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
+                  allowDecimal={false}
+                />
+              </label>
+            </div>
             <label>
               Status
               <select value={form.status} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
@@ -551,20 +573,12 @@ export function FestivalCampaignsPage() {
                 ))}
               </select>
             </label>
-            <label>
-              Display order
-              <NumberField
-                value={form.displayOrder}
-                onChange={(n) => setForm({ ...form, displayOrder: n ?? 0 })}
-                allowDecimal={false}
-              />
-            </label>
-            <div className="sheet-actions">
-              <button type="button" onClick={() => setFormOpen(false)}>
+            <div className="form-actions">
+              <button type="button" className="outline-button" onClick={() => setFormOpen(false)}>
                 Cancel
               </button>
               <button type="submit" className="primary-button" disabled={saving || uploading}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Saving…" : "Save festival"}
               </button>
             </div>
           </form>

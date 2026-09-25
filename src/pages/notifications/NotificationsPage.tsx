@@ -14,6 +14,7 @@ export function NotificationsPage() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -68,6 +69,7 @@ export function NotificationsPage() {
       });
       setTitle("");
       setMessage("");
+      setFormOpen(false);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to broadcast");
@@ -82,28 +84,17 @@ export function NotificationsPage() {
         title="Notifications"
         subtitle="Inbox and system broadcasts."
         actions={
-          <button type="button" className="outline-button" onClick={() => void markAll()}>
-            Mark all read
-          </button>
+          <div className="header-actions">
+            <button type="button" className="outline-button" onClick={() => void markAll()}>
+              Mark all read
+            </button>
+            <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              + Broadcast
+            </button>
+          </div>
         }
       />
       <ErrorBanner message={error} />
-      <form className="panel form-grid" onSubmit={(e) => void broadcast(e)}>
-        <h3 className="span-2">Broadcast notification</h3>
-        <label>
-          Title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <label>
-          Message
-          <input value={message} onChange={(e) => setMessage(e.target.value)} required />
-        </label>
-        <div className="form-actions span-2">
-          <button className="primary-button" disabled={saving}>
-            {saving ? "Sending…" : "Send broadcast"}
-          </button>
-        </div>
-      </form>
 
       <ListToolbar
         query={query}
@@ -161,6 +152,38 @@ export function NotificationsPage() {
             setPageSize(size);
           }}
         />
+      )}
+      {formOpen && (
+        <div className="modal-backdrop" onClick={() => setFormOpen(false)}>
+          <form className="modal panel" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void broadcast(e)}>
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Create</p>
+                <h3>Broadcast notification</h3>
+              </div>
+              <button type="button" className="icon-only" onClick={() => setFormOpen(false)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <ErrorBanner message={error} />
+            <label>
+              Title
+              <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            </label>
+            <label>
+              Message
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4} />
+            </label>
+            <div className="form-actions">
+              <button type="button" className="outline-button" onClick={() => setFormOpen(false)}>
+                Cancel
+              </button>
+              <button className="primary-button" disabled={saving}>
+                {saving ? "Sending…" : "Send broadcast"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </>
   );

@@ -17,6 +17,7 @@ export function SettingsPage() {
   const [groupName, setGroupName] = useState("general");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
   async function load(nextGroup = group) {
     setLoading(true);
@@ -70,6 +71,8 @@ export function SettingsPage() {
       });
       setKeyName("");
       setValue("");
+      setGroupName("general");
+      setFormOpen(false);
       setMessage("Setting created.");
       await load();
     } catch (caught) {
@@ -81,7 +84,15 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Key/value configuration for the platform." />
+      <PageHeader
+        title="Settings"
+        subtitle="Key/value configuration for the platform."
+        actions={
+          <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+            + Add setting
+          </button>
+        }
+      />
       <ListToolbar
         query={query}
         onQueryChange={setQuery}
@@ -152,26 +163,42 @@ export function SettingsPage() {
         }}
       />
 
-      <form className="panel form-grid" onSubmit={(e) => void createSetting(e)}>
-        <h3 className="span-2">Add setting</h3>
-        <label>
-          Key
-          <input value={keyName} onChange={(e) => setKeyName(e.target.value)} required />
-        </label>
-        <label>
-          Group
-          <input value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-        </label>
-        <label className="span-2">
-          Value
-          <input value={value} onChange={(e) => setValue(e.target.value)} required />
-        </label>
-        <div className="form-actions span-2">
-          <button className="primary-button" disabled={saving}>
-            {saving ? "Saving…" : "Create setting"}
-          </button>
+      {formOpen && (
+        <div className="modal-backdrop" onClick={() => setFormOpen(false)}>
+          <form className="modal panel" onClick={(e) => e.stopPropagation()} onSubmit={(e) => void createSetting(e)}>
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Create</p>
+                <h3>New setting</h3>
+              </div>
+              <button type="button" className="icon-only" onClick={() => setFormOpen(false)} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <ErrorBanner message={error} />
+            <label>
+              Key
+              <input value={keyName} onChange={(e) => setKeyName(e.target.value)} required />
+            </label>
+            <label>
+              Group
+              <input value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+            </label>
+            <label>
+              Value
+              <input value={value} onChange={(e) => setValue(e.target.value)} required />
+            </label>
+            <div className="form-actions">
+              <button type="button" className="outline-button" onClick={() => setFormOpen(false)}>
+                Cancel
+              </button>
+              <button className="primary-button" disabled={saving}>
+                {saving ? "Saving…" : "Create setting"}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      )}
     </>
   );
 }

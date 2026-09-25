@@ -277,19 +277,19 @@ export function FestivalBookingsPage() {
       )}
 
       {(detail || detailLoading) && (
-        <div className="drawer-backdrop" onClick={() => !detailLoading && setDetail(null)}>
-          <div className="side-drawer" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => !detailLoading && setDetail(null)}>
+          <div className="modal panel wide" onClick={(e) => e.stopPropagation()}>
             {detailLoading || !detail ? (
               <LoadingState />
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+                <div className="panel-heading">
                   <div>
-                    <h2 style={{ margin: 0 }}>{detail.bookingNumber}</h2>
-                    <small>{detail.festivalName}</small>
+                    <p className="kicker">{detail.festivalName}</p>
+                    <h3>{detail.bookingNumber}</h3>
                   </div>
-                  <button type="button" onClick={() => setDetail(null)}>
-                    Close
+                  <button type="button" className="icon-only" onClick={() => setDetail(null)} aria-label="Close">
+                    ×
                   </button>
                 </div>
 
