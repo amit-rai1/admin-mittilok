@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { api, type NotificationList } from "../lib/api";
@@ -7,20 +7,35 @@ export function NotificationBell() {
   const [count, setCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationList["items"]>([]);
-
-  async function load() {
-    try {
-      const data = await api<{ count: number }>("/notifications/unread-count");
-      setCount(data.count);
-    } catch {
-      setCount(0);
-    }
-  }
+  const openRef = useRef(false);
 
   useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(), 60000);
-    return () => window.clearInterval(timer);
+    openRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        if (openRef.current) {
+          const data = await api<NotificationList>("/notifications?page=1&pageSize=8");
+          if (cancelled) return;
+          setItems(data.items);
+          setCount(data.unreadCount);
+        } else {
+          const data = await api<{ count: number }>("/notifications/unread-count");
+          if (!cancelled) setCount(data.count);
+        }
+      } catch {
+        if (!openRef.current && !cancelled) setCount(0);
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   async function toggle() {
@@ -38,9 +53,32 @@ export function NotificationBell() {
   }
 
   async function markRead(id: number) {
-    await api(`/notifications/${id}/read`, { method: "PATCH" });
+    const target = items.find((n) => n.id === id);
+    if (!target || target.isRead) return;
+    const prevItems = items;
+    const prevCount = count;
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     setCount((c) => Math.max(0, c - 1));
+    try {
+      await api(`/notifications/${id}/read`, { method: "PATCH" });
+    } catch {
+      setItems(prevItems);
+      setCount(prevCount);
+    }
+  }
+
+  async function markAll() {
+    if (count === 0 && items.every((n) => n.isRead)) return;
+    const prevItems = items;
+    const prevCount = count;
+    setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setCount(0);
+    try {
+      await api("/notifications/read-all", { method: "PATCH" });
+    } catch {
+      setItems(prevItems);
+      setCount(prevCount);
+    }
   }
 
   return (
@@ -53,9 +91,16 @@ export function NotificationBell() {
         <div className="notif-panel">
           <div className="notif-head">
             <strong>Notifications</strong>
-            <Link to="/notifications" onClick={() => setOpen(false)}>
-              View all
-            </Link>
+            <span className="notif-head-actions">
+              {count > 0 && (
+                <button type="button" onClick={() => void markAll()}>
+                  Mark all read
+                </button>
+              )}
+              <Link to="/notifications" onClick={() => setOpen(false)}>
+                View all
+              </Link>
+            </span>
           </div>
           {items.length === 0 ? (
             <p className="empty-inline">No notifications yet.</p>

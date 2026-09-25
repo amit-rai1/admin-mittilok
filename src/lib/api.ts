@@ -594,10 +594,47 @@ export function saveSession(auth: AuthResponse) {
   localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
 }
 
+export const ADMIN_SESSION_EXPIRED = "mittilok-admin-session-expired";
+
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
+}
+
+function expireAdminSession() {
+  clearSession();
+  window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED));
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return false;
+    saveSession((await res.json()) as AuthResponse);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function recoverUnauthorized(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = tryRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  const ok = await refreshPromise;
+  if (!ok) expireAdminSession();
+  return ok;
 }
 
 export class ApiError extends Error {
@@ -611,6 +648,7 @@ export class ApiError extends Error {
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   auth?: boolean;
+  skipRefresh?: boolean;
 };
 
 async function parseError(response: Response): Promise<string> {
@@ -623,7 +661,7 @@ async function parseError(response: Response): Promise<string> {
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, auth = true, headers, ...rest } = options;
+  const { body, auth = true, skipRefresh = false, headers, ...rest } = options;
   const finalHeaders = new Headers(headers);
   if (body !== undefined && !(body instanceof FormData)) {
     finalHeaders.set("Content-Type", "application/json");
@@ -639,6 +677,14 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   });
 
+  if (response.status === 401 && auth) {
+    if (!skipRefresh && (await recoverUnauthorized())) {
+      return api<T>(path, { ...options, skipRefresh: true });
+    }
+    if (skipRefresh) expireAdminSession();
+    throw new ApiError("Session expired. Please sign in again.", 401);
+  }
+
   if (response.status === 204) return undefined as T;
 
   if (!response.ok) {
@@ -653,11 +699,16 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return (await response.json()) as T;
 }
 
-export async function downloadFile(path: string, filename: string) {
+export async function downloadFile(path: string, filename: string, skipRefresh = false) {
   const token = getToken();
   const response = await fetch(`${API_BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  if (response.status === 401) {
+    if (!skipRefresh && (await recoverUnauthorized())) return downloadFile(path, filename, true);
+    if (skipRefresh) expireAdminSession();
+    throw new ApiError("Session expired. Please sign in again.", 401);
+  }
   if (!response.ok) throw new ApiError(await parseError(response), response.status);
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  ADMIN_SESSION_EXPIRED,
   api,
   clearSession,
   getStoredUser,
@@ -52,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const onExpired = () => setUser(null);
+    window.addEventListener(ADMIN_SESSION_EXPIRED, onExpired);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED, onExpired);
   }, []);
 
   const value = useMemo<AuthContextValue>(

@@ -956,8 +956,24 @@ label {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
   font-size: 12px;
+}
+
+.notif-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notif-head-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
 }
 
 .notif-item {

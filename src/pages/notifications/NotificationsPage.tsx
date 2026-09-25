@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { EmptyState, ErrorBanner, ListToolbar, LoadingState, PageHeader, Pagination } from "../../components/Layout";
 import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import { api, formatDate, type Notification, type NotificationList } from "../../lib/api";
@@ -16,21 +16,28 @@ export function NotificationsPage() {
   const [saving, setSaving] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setError("");
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) {
+      setLoading(true);
+      setError("");
+    }
     try {
       setData(await api<NotificationList>(`/admin/notifications?page=${page}&pageSize=${pageSize}`));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load notifications");
+      if (!quiet) setError(caught instanceof Error ? caught.message : "Unable to load notifications");
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
-  }
+  }, [page, pageSize]);
 
   useEffect(() => {
-    void load();
-  }, [page, pageSize]);
+    void load(false);
+  }, [load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void load(true), 60000);
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   const filteredItems = useMemo(() => {
     const items = data?.items ?? [];
@@ -40,20 +47,33 @@ export function NotificationsPage() {
   }, [data, appliedQuery]);
 
   async function markAll() {
+    if (!data) return;
+    const prev = data;
+    setData({
+      ...data,
+      unreadCount: 0,
+      items: data.items.map((n) => ({ ...n, isRead: true })),
+    });
     try {
       await api("/notifications/read-all", { method: "PATCH" });
-      await load();
     } catch (caught) {
+      setData(prev);
       setError(caught instanceof Error ? caught.message : "Unable to mark all read");
     }
   }
 
   async function markRead(item: Notification) {
-    if (item.isRead) return;
+    if (item.isRead || !data) return;
+    const prev = data;
+    setData({
+      ...data,
+      unreadCount: Math.max(0, data.unreadCount - 1),
+      items: data.items.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)),
+    });
     try {
       await api(`/notifications/${item.id}/read`, { method: "PATCH" });
-      await load();
     } catch (caught) {
+      setData(prev);
       setError(caught instanceof Error ? caught.message : "Unable to mark read");
     }
   }

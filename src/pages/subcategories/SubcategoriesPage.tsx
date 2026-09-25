@@ -11,6 +11,8 @@ import {
   uploadImage,
   type Category,
   type CategoryForm,
+  type PagedResult,
+  type ServiceItem,
 } from "../../lib/api";
 
 const emptyForm: CategoryForm = {
@@ -133,11 +135,30 @@ export function SubcategoriesPage() {
     setFormOpen(true);
   }
 
-  function openEdit(category: Category) {
+  async function descriptionFor(category: Category) {
+    const own = category.description;
+    if (own != null && own.trim() !== "") return own;
+    const parent = category.parentCategoryId ?? (typeof parentId === "number" ? parentId : null);
+    if (!parent) return own ?? "";
+    try {
+      const result = await api<PagedResult<ServiceItem>>(
+        `/services?categoryId=${parent}&pageSize=100`,
+      );
+      const match = result.items.find(
+        (service) => service.subCategoryId === category.id && service.description?.trim(),
+      );
+      return match?.description?.trim() || own || "";
+    } catch {
+      return own ?? "";
+    }
+  }
+
+  async function openEdit(category: Category) {
+    const description = await descriptionFor(category);
     setEditing(category);
     setForm({
       name: category.name,
-      description: category.description ?? "",
+      description,
       image: category.image ?? "",
       parentCategoryId: category.parentCategoryId ?? (parentId || null),
       type: category.type,
@@ -289,7 +310,7 @@ export function SubcategoriesPage() {
               </div>
               <div>
                 <strong>{item.name}</strong>
-                <small>/{item.slug}</small>
+                <small>{item.description?.trim() || `/${item.slug}`}</small>
               </div>
               <span>{item.productCount ?? 0}</span>
               <span>{item.displayOrder}</span>
@@ -297,7 +318,7 @@ export function SubcategoriesPage() {
                 {item.isActive ? "Active" : "Inactive"}
               </span>
               <div className="row-actions">
-                <button type="button" className="ghost-btn" onClick={() => openEdit(item)}>
+                <button type="button" className="ghost-btn" onClick={() => void openEdit(item)}>
                   Edit
                 </button>
                 <button type="button" className="ghost-btn" onClick={() => void toggleActive(item)}>
