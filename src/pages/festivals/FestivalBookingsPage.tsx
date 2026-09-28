@@ -35,6 +35,8 @@ type FestivalBooking = {
   pincode?: string | null;
   preferredDeliverySlot?: string | null;
   notes?: string | null;
+  potMessage?: string | null;
+  potDesign?: string | null;
   subtotal: number;
   grandTotal: number;
   advanceRequired: number;
@@ -326,7 +328,16 @@ export function FestivalBookingsPage() {
                       {line.potName ? (
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <Thumb src={line.potImage} alt={line.potName} size={40} />
-                          <small>Pot: {line.potName}</small>
+                          <div>
+                            <small>Pot: {line.potName}</small>
+                            {detail.potMessage ? <small style={{ display: "block" }}>Text on the pot: {detail.potMessage}</small> : null}
+                            {detail.potDesign ? <small style={{ display: "block" }}>Design: {detail.potDesign}</small> : null}
+                          </div>
+                        </div>
+                      ) : detail.potMessage || detail.potDesign ? (
+                        <div>
+                          {detail.potMessage ? <small style={{ display: "block" }}>Text on the pot: {detail.potMessage}</small> : null}
+                          {detail.potDesign ? <small style={{ display: "block" }}>Design: {detail.potDesign}</small> : null}
                         </div>
                       ) : null}
                       {(line.addonImages?.length ?? 0) > 0 ? (

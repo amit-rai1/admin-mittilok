@@ -30,6 +30,8 @@ type FestivalCampaign = {
   deliveryStart?: string | null;
   deliveryEnd?: string | null;
   advancePercent: number;
+  minOrderAmount: number;
+  minOrderQuantity: number;
   status: number;
   metaTitle?: string | null;
   metaDescription?: string | null;
@@ -54,6 +56,8 @@ const blank: FestivalCampaign = {
   deliveryStart: "",
   deliveryEnd: "",
   advancePercent: 10,
+  minOrderAmount: 0,
+  minOrderQuantity: 0,
   status: 0,
   metaTitle: "",
   metaDescription: "",
@@ -461,6 +465,8 @@ export function FestivalCampaignsPage() {
                   onClick={() => {
                     setForm({
                       ...item,
+                      minOrderQuantity: item.minOrderQuantity > 0 ? item.minOrderQuantity : Math.floor(item.minOrderAmount ?? 0),
+                      minOrderAmount: 0,
                       bookingStart: toLocalInput(item.bookingStart),
                       bookingEnd: toLocalInput(item.bookingEnd),
                       deliveryStart: toLocalInput(item.deliveryStart),
@@ -551,6 +557,14 @@ export function FestivalCampaignsPage() {
                 <NumberField
                   value={form.advancePercent}
                   onChange={(n) => setForm({ ...form, advancePercent: n ?? 0 })}
+                  allowDecimal={false}
+                />
+              </label>
+              <label>
+                Minimum quantity
+                <NumberField
+                  value={form.minOrderQuantity ?? 0}
+                  onChange={(n) => setForm({ ...form, minOrderQuantity: n ?? 0, minOrderAmount: 0 })}
                   allowDecimal={false}
                 />
               </label>

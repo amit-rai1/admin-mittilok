@@ -18,13 +18,17 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [whatsAppNumber, setWhatsAppNumber] = useState("");
 
   async function load(nextGroup = group) {
     setLoading(true);
     setError("");
     try {
       const qs = nextGroup ? `?group=${encodeURIComponent(nextGroup)}` : "";
-      setItems(await api<Setting[]>(`/admin/settings${qs}`));
+      const list = await api<Setting[]>(`/admin/settings${qs}`);
+      setItems(list);
+      const saved = list.find((item) => item.key === "admin.whatsapp");
+      if (saved || !nextGroup) setWhatsAppNumber(saved?.value ?? "");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load settings");
     } finally {
@@ -43,6 +47,30 @@ export function SettingsPage() {
       ),
     [items, page, pageSize, appliedQuery],
   );
+
+  async function saveWhatsApp() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const existing = items.find((item) => item.key === "admin.whatsapp");
+      await api("/admin/settings", {
+        method: "PUT",
+        body: {
+          id: existing?.id ?? 0,
+          key: "admin.whatsapp",
+          value: whatsAppNumber.trim(),
+          group: existing?.group || "general",
+        },
+      });
+      setMessage("WhatsApp number saved.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save WhatsApp number");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function saveRow(setting: Setting) {
     setSaving(true);
@@ -122,6 +150,24 @@ export function SettingsPage() {
       />
       <ErrorBanner message={error} />
       {message && <div className="success">{message}</div>}
+      <section className="panel" style={{ marginBottom: 16, display: "grid", gap: 10, padding: 16 }}>
+        <h3 style={{ margin: 0 }}>Admin WhatsApp number</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          Festival and checkout orders open WhatsApp on this number. Leave it empty to use 7905995960.
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            value={whatsAppNumber}
+            onChange={(e) => setWhatsAppNumber(e.target.value)}
+            placeholder="7905995960"
+            inputMode="tel"
+            style={{ maxWidth: 240 }}
+          />
+          <button type="button" className="primary-button" disabled={saving} onClick={() => void saveWhatsApp()}>
+            Save number
+          </button>
+        </div>
+      </section>
       {loading ? (
         <LoadingState />
       ) : (
