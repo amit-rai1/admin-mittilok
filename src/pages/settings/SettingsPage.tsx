@@ -19,6 +19,8 @@ export function SettingsPage() {
   const [message, setMessage] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [whatsAppNumber, setWhatsAppNumber] = useState("");
+  const [shippingCharge, setShippingCharge] = useState("79");
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState("999");
 
   async function load(nextGroup = group) {
     setLoading(true);
@@ -29,6 +31,14 @@ export function SettingsPage() {
       setItems(list);
       const saved = list.find((item) => item.key === "admin.whatsapp");
       if (saved || !nextGroup) setWhatsAppNumber(saved?.value ?? "");
+      const charge = list.find((item) => item.key === "shipping.charge");
+      const threshold =
+        list.find((item) => item.key === "shipping.freeThreshold") ??
+        list.find((item) => item.key === "FreeShippingThreshold");
+      if (!nextGroup || nextGroup === "Shipping" || charge || threshold) {
+        if (charge) setShippingCharge(charge.value ?? "79");
+        if (threshold) setFreeShippingThreshold(threshold.value ?? "999");
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load settings");
     } finally {
@@ -67,6 +77,57 @@ export function SettingsPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save WhatsApp number");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveShipping() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    const charge = Number(shippingCharge);
+    const threshold = Number(freeShippingThreshold);
+    if (!Number.isFinite(charge) || charge < 0 || !Number.isFinite(threshold) || threshold < 0) {
+      setError("Enter valid shipping charge and free threshold amounts.");
+      setSaving(false);
+      return;
+    }
+    try {
+      const chargeExisting = items.find((item) => item.key === "shipping.charge");
+      const thresholdExisting =
+        items.find((item) => item.key === "shipping.freeThreshold") ??
+        items.find((item) => item.key === "FreeShippingThreshold");
+      await api("/admin/settings", {
+        method: "PUT",
+        body: {
+          id: chargeExisting?.id ?? 0,
+          key: "shipping.charge",
+          value: String(charge),
+          group: chargeExisting?.group || "Shipping",
+        },
+      });
+      await api("/admin/settings", {
+        method: "PUT",
+        body: {
+          id: thresholdExisting?.key === "shipping.freeThreshold" ? thresholdExisting.id : 0,
+          key: "shipping.freeThreshold",
+          value: String(threshold),
+          group: "Shipping",
+        },
+      });
+      // Keep legacy key in sync for older readers.
+      const legacy = items.find((item) => item.key === "FreeShippingThreshold");
+      if (legacy) {
+        await api("/admin/settings", {
+          method: "PUT",
+          body: { ...legacy, value: String(threshold) },
+        });
+      }
+      setMessage("Shipping settings saved.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save shipping settings");
     } finally {
       setSaving(false);
     }
@@ -150,6 +211,39 @@ export function SettingsPage() {
       />
       <ErrorBanner message={error} />
       {message && <div className="success">{message}</div>}
+      <section className="panel" style={{ marginBottom: 16, display: "grid", gap: 10, padding: 16 }}>
+        <h3 style={{ margin: 0 }}>Shipping</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          Flat shipping charge when the cart is below the free-shipping threshold. Used on cart and checkout.
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span className="muted">Shipping charge (₹)</span>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={shippingCharge}
+              onChange={(e) => setShippingCharge(e.target.value)}
+              style={{ maxWidth: 160 }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span className="muted">Free shipping from (₹)</span>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={freeShippingThreshold}
+              onChange={(e) => setFreeShippingThreshold(e.target.value)}
+              style={{ maxWidth: 180 }}
+            />
+          </label>
+          <button type="button" className="primary-button" disabled={saving} onClick={() => void saveShipping()}>
+            Save shipping
+          </button>
+        </div>
+      </section>
       <section className="panel" style={{ marginBottom: 16, display: "grid", gap: 10, padding: 16 }}>
         <h3 style={{ margin: 0 }}>Admin WhatsApp number</h3>
         <p className="muted" style={{ margin: 0 }}>
