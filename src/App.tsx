@@ -12,6 +12,7 @@ import { OrdersPage } from "./pages/orders/OrdersPage";
 import { OrderDetailPage } from "./pages/orders/OrderDetailPage";
 import { ReturnsPage } from "./pages/orders/ReturnsPage";
 import { CustomersPage } from "./pages/customers/CustomersPage";
+import { ContactsPage } from "./pages/ContactsPage";
 import { ServicesPage } from "./pages/services/ServicesPage";
 import { BookingsPage } from "./pages/services/BookingsPage";
 import { EnquiriesPage } from "./pages/services/EnquiriesPage";
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="orders/returns" element={<ReturnsPage />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
         <Route path="customers" element={<CustomersPage />} />
+        <Route path="contacts" element={<ContactsPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="services/bookings" element={<BookingsPage />} />
         <Route path="services/enquiries" element={<EnquiriesPage />} />

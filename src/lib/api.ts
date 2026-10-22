@@ -411,6 +411,16 @@ export type Quote = {
   createdAt: string;
 };
 
+export type EnquiryReply = {
+  id: number;
+  enquiryId: number;
+  adminUserId: number;
+  adminName?: string | null;
+  subject: string;
+  body: string;
+  sentAt: string;
+};
+
 export type Enquiry = {
   id: number;
   name: string;
@@ -426,6 +436,7 @@ export type Enquiry = {
   status: number;
   createdAt: string;
   quotes: Quote[];
+  replies?: EnquiryReply[];
 };
 
 export type PodcastBooking = {

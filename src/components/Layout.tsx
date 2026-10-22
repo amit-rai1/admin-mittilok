@@ -74,6 +74,7 @@ const NAV: NavGroup[] = [
   {
     items: [
       { to: "/customers", label: "Customers", icon: Users },
+      { to: "/contacts", label: "Contacts", icon: MessageSquare },
       { to: "/inventory", label: "Inventory", icon: Boxes },
       { to: "/marketing/coupons", label: "Coupons", icon: Ticket },
       { to: "/notifications", label: "Notifications", icon: Megaphone },
@@ -100,6 +101,7 @@ const TITLE_MAP: Record<string, string> = {
   "/orders": "Orders",
   "/orders/returns": "Returns",
   "/customers": "Customers",
+  "/contacts": "Contacts",
   "/services": "Services",
   "/services/bookings": "Service bookings",
   "/services/enquiries": "Enquiries",
