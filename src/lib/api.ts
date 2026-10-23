@@ -95,6 +95,23 @@ export type DashboardStats = {
   unreadNotifications: number;
 };
 
+export type CartVerticalUser = {
+  userId: number;
+  fullName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  itemCount: number;
+  lastCartUpdate?: string | null;
+  sampleProducts: string[];
+};
+
+export type CartVerticalAnalytics = {
+  nurseryUserCount: number;
+  organicsUserCount: number;
+  nurseryUsers: CartVerticalUser[];
+  organicsUsers: CartVerticalUser[];
+};
+
 export type Category = {
   id: number;
   name: string;

@@ -1,11 +1,57 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Boxes, IndianRupee, MessageSquare, ShoppingBag, Users } from "lucide-react";
+import { Boxes, IndianRupee, Leaf, MessageSquare, ShoppingBag, Sprout, Users } from "lucide-react";
 import { EmptyState, ErrorBanner, LoadingState, PageHeader } from "../components/Layout";
-import { api, formatMoney, type DashboardStats, type InventoryItem, type Order, ORDER_STATUS, statusClass } from "../lib/api";
+import {
+  api,
+  formatMoney,
+  type CartVerticalAnalytics,
+  type CartVerticalUser,
+  type DashboardStats,
+  type InventoryItem,
+  type Order,
+  ORDER_STATUS,
+  statusClass,
+} from "../lib/api";
+
+function CartUserList({
+  users,
+  totalCount,
+  empty,
+}: {
+  users: CartVerticalUser[];
+  totalCount: number;
+  empty: string;
+}) {
+  if (!users.length) return <EmptyState message={empty} />;
+  return (
+    <>
+      <div className="stack-list">
+        {users.map((user) => (
+          <div className="stack-row" key={user.userId}>
+            <div>
+              <strong>{user.fullName || user.email || `User #${user.userId}`}</strong>
+              <small>
+                {[user.phone, user.email].filter(Boolean).join(" · ") || "No contact"}
+                {user.sampleProducts?.length ? ` · ${user.sampleProducts.join(", ")}` : ""}
+              </small>
+            </div>
+            <span>{user.itemCount} items</span>
+          </div>
+        ))}
+      </div>
+      {totalCount > users.length ? (
+        <p className="muted" style={{ marginTop: 8 }}>
+          Showing {users.length} of {totalCount}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [cartInterest, setCartInterest] = useState<CartVerticalAnalytics | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [lowStock, setLowStock] = useState<InventoryItem[]>([]);
   const [error, setError] = useState("");
@@ -16,15 +62,17 @@ export function DashboardPage() {
     async function load() {
       setLoading(true);
       try {
-        const [dash, orderPage, inventory] = await Promise.all([
+        const [dash, orderPage, inventory, carts] = await Promise.all([
           api<DashboardStats>("/admin/dashboard"),
           api<{ items: Order[] }>("/admin/orders?page=1&pageSize=6"),
           api<{ items: InventoryItem[] }>("/admin/inventory?lowStockOnly=true&page=1&pageSize=6"),
+          api<CartVerticalAnalytics>("/admin/dashboard/carts-by-vertical").catch(() => null),
         ]);
         if (cancelled) return;
         setStats(dash);
         setOrders(orderPage.items);
         setLowStock(inventory.items);
+        setCartInterest(carts);
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "Unable to load dashboard");
       } finally {
@@ -45,6 +93,12 @@ export function DashboardPage() {
         { label: "Revenue today", value: formatMoney(stats.revenueToday), hint: `${formatMoney(stats.revenueMonth)} this month`, icon: IndianRupee, tone: "yellow" },
         { label: "Customers", value: stats.totalCustomers, hint: "Registered buyers", icon: Users, tone: "blue" },
         { label: "Needs attention", value: stats.lowStockProducts + stats.openEnquiries, hint: `${stats.lowStockProducts} low stock · ${stats.openEnquiries} enquiries`, icon: Boxes, tone: "coral" },
+        ...(cartInterest
+          ? [
+              { label: "Nursery in cart", value: cartInterest.nurseryUserCount, hint: "Users with Nursery items", icon: Sprout, tone: "mint" as const },
+              { label: "Organics in cart", value: cartInterest.organicsUserCount, hint: "Users with Organics items", icon: Leaf, tone: "yellow" as const },
+            ]
+          : []),
       ]
     : [];
 
@@ -123,6 +177,43 @@ export function DashboardPage() {
           )}
         </section>
       </div>
+
+      {cartInterest && (
+        <div className="dashboard-grid">
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Cart interest</p>
+                <h3>Nursery ({cartInterest.nurseryUserCount})</h3>
+              </div>
+              <Link className="text-button" to="/cart-interest/nursery">
+                View all →
+              </Link>
+            </div>
+            <CartUserList
+              users={cartInterest.nurseryUsers}
+              totalCount={cartInterest.nurseryUserCount}
+              empty="No users with Nursery items in cart."
+            />
+          </section>
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Cart interest</p>
+                <h3>Organics ({cartInterest.organicsUserCount})</h3>
+              </div>
+              <Link className="text-button" to="/cart-interest/organics">
+                View all →
+              </Link>
+            </div>
+            <CartUserList
+              users={cartInterest.organicsUsers}
+              totalCount={cartInterest.organicsUserCount}
+              empty="No users with Organics items in cart."
+            />
+          </section>
+        </div>
+      )}
 
       {stats && (
         <section className="panel activity">

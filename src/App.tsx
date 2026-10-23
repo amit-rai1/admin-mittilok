@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/Login";
 import { DashboardPage } from "./pages/Dashboard";
+import { CartInterestPage } from "./pages/CartInterestPage";
 import { CategoriesPage } from "./pages/categories/CategoriesPage";
 import { SubcategoriesPage } from "./pages/subcategories/SubcategoriesPage";
 import { ProductsPage } from "./pages/products/ProductsPage";
@@ -50,6 +51,7 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="cart-interest/:vertical" element={<CartInterestPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="subcategories" element={<SubcategoriesPage />} />
         <Route path="products" element={<ProductsPage />} />
