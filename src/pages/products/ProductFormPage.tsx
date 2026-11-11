@@ -4,6 +4,7 @@ import { ErrorBanner, LoadingState, PageHeader } from "../../components/Layout";
 import { NumberField } from "../../components/NumberField";
 import {
   api,
+  getErrorMessage,
   mediaUrl,
   PRODUCT_STATUS,
   resolveStockStatus,
@@ -15,6 +16,24 @@ import {
   type ProductHighlight,
   type ProductImage,
 } from "../../lib/api";
+import { toast } from "../../lib/toast";
+
+function mergeCategoryOption(list: Category[], currentId: number | null | undefined, fallbackName?: string | null) {
+  if (!currentId) return list;
+  if (list.some((c) => c.id === currentId)) return list;
+  return [
+    ...list,
+    {
+      id: currentId,
+      name: fallbackName?.trim() || `Category #${currentId} (inactive)`,
+      slug: "",
+      type: 0,
+      displayOrder: 9999,
+      isActive: false,
+      parentCategoryId: null,
+    } as Category,
+  ];
+}
 
 const blank: ProductForm = {
   sku: "",
@@ -118,6 +137,7 @@ export function ProductFormPage() {
   const [form, setForm] = useState<ProductForm>(blank);
   const [roots, setRoots] = useState<Category[]>([]);
   const [subs, setSubs] = useState<Category[]>([]);
+  const [lockedSubName, setLockedSubName] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -132,21 +152,31 @@ export function ProductFormPage() {
       setLoading(true);
       setError("");
       try {
-        const cats = await api<Category[]>("/categories?rootsOnly=true&type=0");
+        let cats = await api<Category[]>("/categories?rootsOnly=true&type=0&activeOnly=true");
         if (cancelled) return;
-        setRoots(cats);
         if (isEdit && id) {
           const product = await api<ProductDetail>(`/products/${id}`);
           if (cancelled) return;
           const mapped = mapDetailToForm(product);
+          cats = mergeCategoryOption(cats, mapped.categoryId, product.categoryName);
+          setRoots(cats);
+          setLockedSubName(product.subCategoryName ?? null);
           setForm(mapped);
           setUseVariants((mapped.variants?.length ?? 0) > 0);
           setSlugTouched(true);
-        } else if (cats[0]) {
-          setForm((prev) => ({ ...prev, categoryId: cats[0].id }));
+        } else {
+          setRoots(cats);
+          setLockedSubName(null);
+          if (cats[0]) {
+            setForm((prev) => ({ ...prev, categoryId: cats[0].id }));
+          }
         }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : "Unable to load product");
+        if (!cancelled) {
+          const message = getErrorMessage(caught, "Unable to load product");
+          setError(message);
+          toast.error(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -163,9 +193,10 @@ export function ProductFormPage() {
       return;
     }
     let cancelled = false;
-    void api<Category[]>(`/categories?parentId=${form.categoryId}`)
+    void api<Category[]>(`/categories?parentId=${form.categoryId}&activeOnly=true`)
       .then((list) => {
-        if (!cancelled) setSubs(list);
+        if (cancelled) return;
+        setSubs(mergeCategoryOption(list, form.subCategoryId, lockedSubName));
       })
       .catch(() => {
         if (!cancelled) setSubs([]);
@@ -173,7 +204,7 @@ export function ProductFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [form.categoryId]);
+  }, [form.categoryId, form.subCategoryId, lockedSubName]);
 
   const stockStatus = useMemo(
     () => resolveStockStatus(form.stockQuantity, form.lowStockThreshold),
@@ -226,8 +257,11 @@ export function ProductFormPage() {
         });
       }
       setImages([...(form.images ?? []), ...uploaded]);
+      toast.success(uploaded.length === 1 ? "Image uploaded." : `${uploaded.length} images uploaded.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to upload images");
+      const message = getErrorMessage(caught, "Unable to upload images");
+      setError(message);
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -246,13 +280,16 @@ export function ProductFormPage() {
 
   async function save(nextStatus: number) {
     if (!form.categoryId) {
-      setError("Category is required.");
+      const message = "Category is required.";
+      setError(message);
+      toast.error(message);
       return;
     }
     if (nextStatus === PRODUCT_STATUS.Active) {
       const issue = validateForPublish();
       if (issue) {
         setError(issue);
+        toast.error(issue);
         return;
       }
     }
@@ -276,13 +313,17 @@ export function ProductFormPage() {
       };
       if (isEdit && id) {
         await api(`/admin/products/${id}`, { method: "PUT", body: payload });
+        toast.success("Product saved.");
         navigate("/products");
       } else {
         const created = await api<ProductDetail>("/admin/products", { method: "POST", body: payload });
+        toast.success("Product created.");
         navigate(`/products/${created.id}`);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save product");
+      const message = getErrorMessage(caught, "Unable to save product");
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -362,13 +403,14 @@ export function ProductFormPage() {
               Category *
               <select
                 value={form.categoryId}
-                onChange={(e) =>
+                onChange={(e) => {
+                  setLockedSubName(null);
                   setForm((prev) => ({
                     ...prev,
                     categoryId: Number(e.target.value),
                     subCategoryId: null,
-                  }))
-                }
+                  }));
+                }}
                 required
               >
                 <option value={0} disabled>

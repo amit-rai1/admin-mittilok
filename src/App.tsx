@@ -25,6 +25,7 @@ import { FestivalDemandPage } from "./pages/festivals/FestivalDemandPage";
 import { CouponsPage } from "./pages/marketing/CouponsPage";
 import { BannersPage } from "./pages/marketing/BannersPage";
 import { HomepagePage } from "./pages/content/HomepagePage";
+import { TeamPage } from "./pages/content/TeamPage";
 import { ReviewsPage } from "./pages/reviews/ReviewsPage";
 import { InventoryPage } from "./pages/inventory/InventoryPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="marketing/coupons" element={<CouponsPage />} />
         <Route path="marketing/banners" element={<BannersPage />} />
         <Route path="content/homepage" element={<HomepagePage />} />
+        <Route path="content/team" element={<TeamPage />} />
         <Route path="reviews" element={<ReviewsPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="reports" element={<ReportsPage />} />

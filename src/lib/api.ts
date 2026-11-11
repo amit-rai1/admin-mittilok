@@ -380,6 +380,25 @@ export type HomepageSection = {
   isEnabled: boolean;
 };
 
+export type TeamMember = {
+  id: number;
+  teamGroupId: number;
+  name: string;
+  role?: string | null;
+  photoUrl?: string | null;
+  bio?: string | null;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+export type TeamGroup = {
+  id: number;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+  members: TeamMember[];
+};
+
 export type Setting = {
   id: number;
   key: string;
@@ -679,13 +698,67 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   skipRefresh?: boolean;
 };
 
+type ErrorPayload = {
+  message?: string;
+  title?: string;
+  detail?: string;
+  error?: string;
+  errors?: unknown;
+  code?: string;
+};
+
+function flattenErrors(errors: unknown): string[] {
+  if (!errors) return [];
+  if (Array.isArray(errors)) {
+    return errors.flatMap((item) => {
+      if (typeof item === "string") return [item];
+      if (item && typeof item === "object") {
+        const row = item as { errorMessage?: string; message?: string };
+        if (row.errorMessage) return [row.errorMessage];
+        if (row.message) return [row.message];
+      }
+      return [];
+    });
+  }
+  if (typeof errors === "object") {
+    return Object.values(errors as Record<string, unknown>).flatMap((value) => {
+      if (typeof value === "string") return [value];
+      if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+      return [];
+    });
+  }
+  return [];
+}
+
 async function parseError(response: Response): Promise<string> {
   try {
-    const data = (await response.json()) as { message?: string };
-    return data.message ?? (response.statusText || "Request failed");
+    const data = (await response.json()) as ErrorPayload;
+    const parts = flattenErrors(data.errors);
+    const primary =
+      data.message?.trim()
+      || data.detail?.trim()
+      || data.title?.trim()
+      || data.error?.trim()
+      || "";
+    if (parts.length) {
+      if (primary && primary.toLowerCase() !== "validation failed.") {
+        return [primary, ...parts].join(" ");
+      }
+      return parts.join(" ");
+    }
+    if (primary) return primary;
+    return response.statusText || "Request failed";
   } catch {
     return response.statusText || "Request failed";
   }
+}
+
+/** Normalize caught API / validation errors for banners and toasts. */
+export function getErrorMessage(caught: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (caught instanceof ApiError && caught.message.trim()) return caught.message.trim();
+  if (caught instanceof Error && caught.message.trim()) return caught.message.trim();
+  if (typeof caught === "string" && caught.trim()) return caught.trim();
+  return fallback;
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {

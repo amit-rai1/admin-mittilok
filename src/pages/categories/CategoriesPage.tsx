@@ -6,12 +6,14 @@ import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPag
 import {
   api,
   CATEGORY_TYPE,
+  getErrorMessage,
   mediaUrl,
   statusClass,
   uploadImage,
   type Category,
   type CategoryForm,
 } from "../../lib/api";
+import { toast } from "../../lib/toast";
 
 const emptyForm: CategoryForm = {
   name: "",
@@ -44,7 +46,9 @@ export function CategoriesPage() {
     try {
       setItems(await api<Category[]>("/categories?rootsOnly=true"));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load categories");
+      const message = getErrorMessage(caught, "Unable to load categories");
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -84,7 +88,9 @@ export function CategoriesPage() {
       const uploaded = await uploadImage(file, "categories");
       setForm((prev) => ({ ...prev, image: uploaded.path || uploaded.url }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to upload image");
+      const message = getErrorMessage(caught, "Unable to upload image");
+      setError(message);
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -102,13 +108,17 @@ export function CategoriesPage() {
       };
       if (editing) {
         await api(`/admin/categories/${editing.id}`, { method: "PUT", body: payload });
+        toast.success("Category saved.");
       } else {
         await api("/admin/categories", { method: "POST", body: payload });
+        toast.success("Category created.");
       }
       setFormOpen(false);
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save category");
+      const message = getErrorMessage(caught, "Unable to save category");
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -131,9 +141,12 @@ export function CategoriesPage() {
           metaDescription: category.metaDescription ?? "",
         } satisfies CategoryForm,
       });
+      toast.success(category.isActive ? "Category disabled." : "Category enabled.");
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to update status");
+      const message = getErrorMessage(caught, "Unable to update status");
+      setError(message);
+      toast.error(message);
     }
   }
 
@@ -141,9 +154,12 @@ export function CategoriesPage() {
     if (!window.confirm("Delete this category?")) return;
     try {
       await api(`/admin/categories/${id}`, { method: "DELETE" });
+      toast.success("Category deleted.");
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete category");
+      const message = getErrorMessage(caught, "Unable to delete category");
+      setError(message);
+      toast.error(message);
     }
   }
 

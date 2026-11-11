@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Ticket,
   Users,
+  UsersRound,
   X,
   Home,
   Layers,
@@ -86,6 +87,7 @@ const NAV: NavGroup[] = [
     label: "Content",
     items: [
       { to: "/content/homepage", label: "Homepage", icon: Home },
+      { to: "/content/team", label: "Team", icon: UsersRound },
       { to: "/marketing/banners", label: "Banners", icon: Image },
     ],
   },
@@ -112,6 +114,7 @@ const TITLE_MAP: Record<string, string> = {
   "/marketing/coupons": "Coupons",
   "/marketing/banners": "Banners",
   "/content/homepage": "Homepage",
+  "/content/team": "Team",
   "/reviews": "Reviews",
   "/reports": "Reports",
   "/settings": "Settings",
