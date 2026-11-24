@@ -5,6 +5,7 @@ import { resultRange, DEFAULT_PAGE_SIZE } from "../../lib/listPaging";
 import {
   api,
   formatMoney,
+  getErrorMessage,
   mediaUrl,
   PRODUCT_STATUS,
   statusClass,
@@ -13,6 +14,7 @@ import {
   type ProductDetail,
   type ProductListItem,
 } from "../../lib/api";
+import { toast } from "../../lib/toast";
 
 export function ProductsPage() {
   const navigate = useNavigate();
@@ -31,7 +33,7 @@ export function ProductsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
 
   useEffect(() => {
-    void api<Category[]>("/categories?rootsOnly=true&type=0")
+    void api<Category[]>("/categories?rootsOnly=true&type=0&activeOnly=true")
       .then(setRoots)
       .catch(() => setRoots([]));
   }, []);
@@ -42,7 +44,7 @@ export function ProductsPage() {
       setSubCategoryId("");
       return;
     }
-    void api<Category[]>(`/categories?parentId=${categoryId}`)
+    void api<Category[]>(`/categories?parentId=${categoryId}&activeOnly=true`)
       .then(setSubs)
       .catch(() => setSubs([]));
     setSubCategoryId("");
@@ -64,7 +66,9 @@ export function ProductsPage() {
       if (stock) params.set("stock", stock);
       setData(await api<PagedResult<ProductListItem>>(`/products?${params}`));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load products");
+      const message = getErrorMessage(caught, "Unable to load products");
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -84,9 +88,12 @@ export function ProductsPage() {
     setError("");
     try {
       const copy = await api<ProductDetail>(`/admin/products/${id}/duplicate`, { method: "POST" });
+      toast.success("Product duplicated.");
       navigate(`/products/${copy.id}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to duplicate product");
+      const message = getErrorMessage(caught, "Unable to duplicate product");
+      setError(message);
+      toast.error(message);
     } finally {
       setBusyId(null);
     }
@@ -142,8 +149,11 @@ export function ProductsPage() {
         },
       });
       await load(page);
+      toast.success(nextStatus === PRODUCT_STATUS.Inactive ? "Product disabled." : "Product enabled.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to update product status");
+      const message = getErrorMessage(caught, "Unable to update product status");
+      setError(message);
+      toast.error(message);
     } finally {
       setBusyId(null);
     }
@@ -154,9 +164,12 @@ export function ProductsPage() {
     setBusyId(id);
     try {
       await api(`/admin/products/${id}`, { method: "DELETE" });
+      toast.success("Product deleted.");
       await load(page);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete product");
+      const message = getErrorMessage(caught, "Unable to delete product");
+      setError(message);
+      toast.error(message);
     } finally {
       setBusyId(null);
     }

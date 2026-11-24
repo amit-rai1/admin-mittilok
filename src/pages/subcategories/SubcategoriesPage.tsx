@@ -6,6 +6,7 @@ import { DEFAULT_PAGE_SIZE, paginateLocal, resultRange } from "../../lib/listPag
 import {
   api,
   CATEGORY_TYPE,
+  getErrorMessage,
   mediaUrl,
   statusClass,
   uploadImage,
@@ -14,6 +15,7 @@ import {
   type PagedResult,
   type ServiceItem,
 } from "../../lib/api";
+import { toast } from "../../lib/toast";
 
 const emptyForm: CategoryForm = {
   name: "",
@@ -66,7 +68,11 @@ export function SubcategoriesPage() {
           if (!parentIdParam) setSearchParams({ parentId: String(nextId) }, { replace: true });
         }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : "Unable to load categories");
+        if (!cancelled) {
+          const message = getErrorMessage(caught, "Unable to load categories");
+          setError(message);
+          toast.error(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -94,7 +100,9 @@ export function SubcategoriesPage() {
     try {
       setItems(await api<Category[]>(`/categories?parentId=${id}`));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load subcategories");
+      const message = getErrorMessage(caught, "Unable to load subcategories");
+      setError(message);
+      toast.error(message);
     } finally {
       setListLoading(false);
     }
@@ -178,7 +186,9 @@ export function SubcategoriesPage() {
       const uploaded = await uploadImage(file, "categories");
       setForm((prev) => ({ ...prev, image: uploaded.path || uploaded.url }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to upload image");
+      const message = getErrorMessage(caught, "Unable to upload image");
+      setError(message);
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -187,7 +197,9 @@ export function SubcategoriesPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!form.parentCategoryId) {
-      setError("Parent category is required.");
+      const message = "Parent category is required.";
+      setError(message);
+      toast.error(message);
       return;
     }
     setSaving(true);
@@ -201,13 +213,17 @@ export function SubcategoriesPage() {
       };
       if (editing) {
         await api(`/admin/categories/${editing.id}`, { method: "PUT", body: payload });
+        toast.success("Subcategory saved.");
       } else {
         await api("/admin/categories", { method: "POST", body: payload });
+        toast.success("Subcategory created.");
       }
       setFormOpen(false);
       await loadChildren(parentId);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save subcategory");
+      const message = getErrorMessage(caught, "Unable to save subcategory");
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -230,9 +246,12 @@ export function SubcategoriesPage() {
           metaDescription: category.metaDescription ?? "",
         } satisfies CategoryForm,
       });
+      toast.success(category.isActive ? "Subcategory disabled." : "Subcategory enabled.");
       await loadChildren(parentId);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to update status");
+      const message = getErrorMessage(caught, "Unable to update status");
+      setError(message);
+      toast.error(message);
     }
   }
 
@@ -240,9 +259,12 @@ export function SubcategoriesPage() {
     if (!window.confirm("Delete this subcategory?")) return;
     try {
       await api(`/admin/categories/${id}`, { method: "DELETE" });
+      toast.success("Subcategory deleted.");
       await loadChildren(parentId);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete subcategory");
+      const message = getErrorMessage(caught, "Unable to delete subcategory");
+      setError(message);
+      toast.error(message);
     }
   }
 

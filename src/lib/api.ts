@@ -68,6 +68,32 @@ export type User = {
   userType: string;
   roles: string[];
   permissions: string[];
+  partnerNurseryId?: number | null;
+  partnerStatus?: string | null;
+  partnerName?: string | null;
+};
+
+export type PartnerNursery = {
+  id: number;
+  userId: number;
+  businessName: string;
+  ownerName: string;
+  description?: string | null;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  gstin?: string | null;
+  status: string | number;
+  statusName: string;
+  isPlatformOwned: boolean;
+  isActive: boolean;
+  reviewNotes?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
 };
 
 export type AuthResponse = {
@@ -93,6 +119,23 @@ export type DashboardStats = {
   lowStockProducts: number;
   openEnquiries: number;
   unreadNotifications: number;
+};
+
+export type CartVerticalUser = {
+  userId: number;
+  fullName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  itemCount: number;
+  lastCartUpdate?: string | null;
+  sampleProducts: string[];
+};
+
+export type CartVerticalAnalytics = {
+  nurseryUserCount: number;
+  organicsUserCount: number;
+  nurseryUsers: CartVerticalUser[];
+  organicsUsers: CartVerticalUser[];
 };
 
 export type Category = {
@@ -363,6 +406,25 @@ export type HomepageSection = {
   isEnabled: boolean;
 };
 
+export type TeamMember = {
+  id: number;
+  teamGroupId: number;
+  name: string;
+  role?: string | null;
+  photoUrl?: string | null;
+  bio?: string | null;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+export type TeamGroup = {
+  id: number;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+  members: TeamMember[];
+};
+
 export type Setting = {
   id: number;
   key: string;
@@ -411,6 +473,16 @@ export type Quote = {
   createdAt: string;
 };
 
+export type EnquiryReply = {
+  id: number;
+  enquiryId: number;
+  adminUserId: number;
+  adminName?: string | null;
+  subject: string;
+  body: string;
+  sentAt: string;
+};
+
 export type Enquiry = {
   id: number;
   name: string;
@@ -426,6 +498,7 @@ export type Enquiry = {
   status: number;
   createdAt: string;
   quotes: Quote[];
+  replies?: EnquiryReply[];
 };
 
 export type PodcastBooking = {
@@ -568,8 +641,23 @@ export const PRICING_TYPE: Record<number, string> = {
   4: "Custom quote",
 };
 
+export function isPartnerOnly(user: User | null | undefined): boolean {
+  if (!user) return false;
+  const roles = user.roles ?? [];
+  return roles.includes("PARTNER") && !roles.some((r) => r === "SUPER_ADMIN" || r === "ADMIN");
+}
+
+export function isPlatformStaff(user: User | null | undefined): boolean {
+  if (!user) return false;
+  if (isPartnerOnly(user)) return false;
+  if (user.userType === "AdminStaff") return true;
+  return user.roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+}
+
+/** Admin console access: platform staff or an approved nursery partner. */
 export function isAdminUser(user: User | null | undefined): boolean {
   if (!user) return false;
+  if (isPartnerOnly(user)) return true;
   if (user.userType === "AdminStaff") return true;
   return user.roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
 }
@@ -651,13 +739,67 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   skipRefresh?: boolean;
 };
 
+type ErrorPayload = {
+  message?: string;
+  title?: string;
+  detail?: string;
+  error?: string;
+  errors?: unknown;
+  code?: string;
+};
+
+function flattenErrors(errors: unknown): string[] {
+  if (!errors) return [];
+  if (Array.isArray(errors)) {
+    return errors.flatMap((item) => {
+      if (typeof item === "string") return [item];
+      if (item && typeof item === "object") {
+        const row = item as { errorMessage?: string; message?: string };
+        if (row.errorMessage) return [row.errorMessage];
+        if (row.message) return [row.message];
+      }
+      return [];
+    });
+  }
+  if (typeof errors === "object") {
+    return Object.values(errors as Record<string, unknown>).flatMap((value) => {
+      if (typeof value === "string") return [value];
+      if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+      return [];
+    });
+  }
+  return [];
+}
+
 async function parseError(response: Response): Promise<string> {
   try {
-    const data = (await response.json()) as { message?: string };
-    return data.message ?? (response.statusText || "Request failed");
+    const data = (await response.json()) as ErrorPayload;
+    const parts = flattenErrors(data.errors);
+    const primary =
+      data.message?.trim()
+      || data.detail?.trim()
+      || data.title?.trim()
+      || data.error?.trim()
+      || "";
+    if (parts.length) {
+      if (primary && primary.toLowerCase() !== "validation failed.") {
+        return [primary, ...parts].join(" ");
+      }
+      return parts.join(" ");
+    }
+    if (primary) return primary;
+    return response.statusText || "Request failed";
   } catch {
     return response.statusText || "Request failed";
   }
+}
+
+/** Normalize caught API / validation errors for banners and toasts. */
+export function getErrorMessage(caught: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (caught instanceof ApiError && caught.message.trim()) return caught.message.trim();
+  if (caught instanceof Error && caught.message.trim()) return caught.message.trim();
+  if (typeof caught === "string" && caught.trim()) return caught.trim();
+  return fallback;
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
