@@ -40,7 +40,7 @@ export function LoginPage() {
             <br />
             <em>behind the garden.</em>
           </h1>
-          <p>Manage catalog, orders, services, content, and day-to-day nursery operations from one place.</p>
+          <p>Platform staff and approved nursery partners sign in here. Partners see only their own nursery workspace.</p>
         </div>
         <small>© {new Date().getFullYear()} MittiLok Nursery</small>
       </div>
@@ -73,7 +73,7 @@ export function LoginPage() {
         <button className="primary-button" disabled={submitting}>
           {submitting ? "Signing in…" : "Enter dashboard"} <span>→</span>
         </button>
-        <p className="login-hint">Only AdminStaff accounts with RBAC permissions can access this portal.</p>
+        <p className="login-hint">Use your staff account, or an approved partner email after MittiLok reviews your application.</p>
       </form>
     </main>
   );

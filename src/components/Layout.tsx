@@ -22,17 +22,29 @@ import {
   X,
   Home,
   Layers,
+  Store,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { NotificationBell } from "./NotificationBell";
 import { PAGE_SIZE_OPTIONS } from "../lib/listPaging";
+import { isPartnerOnly } from "../lib/api";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavGroup = { label?: string; items: NavItem[] };
 
+const PARTNER_NAV: NavGroup[] = [
+  {
+    items: [{ to: "/", label: "My nursery", icon: Store }],
+  },
+];
+
 const NAV: NavGroup[] = [
   {
     items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "Marketplace",
+    items: [{ to: "/partners", label: "Partners", icon: Store }],
   },
   {
     label: "Catalog",
@@ -119,12 +131,16 @@ const TITLE_MAP: Record<string, string> = {
   "/reports": "Reports",
   "/settings": "Settings",
   "/notifications": "Notifications",
+  "/partners": "Partner nurseries",
+  "/partner/nursery": "My nursery",
 };
 
 export function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const partner = isPartnerOnly(user);
+  const nav = partner ? PARTNER_NAV : NAV;
 
   const title = useMemo(() => {
     if (location.pathname.startsWith("/products/") && location.pathname !== "/products/new") return "Edit product";
@@ -146,7 +162,7 @@ export function Layout() {
           </button>
         </div>
         <nav className="sidebar-nav">
-          {NAV.map((group, index) => (
+          {nav.map((group, index) => (
             <div key={group.label ?? `group-${index}`} className="nav-group">
               {group.label && <p className="nav-label">{group.label}</p>}
               {group.items.map(({ to, label, icon: Icon }) => (
@@ -185,11 +201,11 @@ export function Layout() {
             <Menu size={20} />
           </button>
           <div>
-            <p className="kicker">MittiLok operations</p>
+            <p className="kicker">{partner ? "Partner workspace" : "MittiLok operations"}</p>
             <h1>{title}</h1>
           </div>
           <div className="header-actions">
-            <NotificationBell />
+            {!partner && <NotificationBell />}
             <div className="header-avatar">{(user?.name ?? "A").slice(0, 2).toUpperCase()}</div>
           </div>
         </header>

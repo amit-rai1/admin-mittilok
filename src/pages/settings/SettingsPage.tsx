@@ -21,6 +21,7 @@ export function SettingsPage() {
   const [whatsAppNumber, setWhatsAppNumber] = useState("");
   const [shippingCharge, setShippingCharge] = useState("79");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("999");
+  const [marketplaceEnabled, setMarketplaceEnabled] = useState(false);
 
   async function load(nextGroup = group) {
     setLoading(true);
@@ -39,6 +40,8 @@ export function SettingsPage() {
         if (charge) setShippingCharge(charge.value ?? "79");
         if (threshold) setFreeShippingThreshold(threshold.value ?? "999");
       }
+      const marketplace = list.find((item) => item.key === "marketplace.enabled");
+      if (marketplace) setMarketplaceEnabled(marketplace.value === "true");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load settings");
     } finally {
@@ -128,6 +131,30 @@ export function SettingsPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save shipping settings");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveMarketplace() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const existing = items.find((item) => item.key === "marketplace.enabled");
+      await api("/admin/settings", {
+        method: "PUT",
+        body: {
+          id: existing?.id ?? 0,
+          key: "marketplace.enabled",
+          value: marketplaceEnabled ? "true" : "false",
+          group: existing?.group || "Marketplace",
+        },
+      });
+      setMessage("Marketplace setting saved. Shop listing mode still uses the current catalogue until later phases.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save marketplace setting");
     } finally {
       setSaving(false);
     }
@@ -241,6 +268,25 @@ export function SettingsPage() {
           </label>
           <button type="button" className="primary-button" disabled={saving} onClick={() => void saveShipping()}>
             Save shipping
+          </button>
+        </div>
+      </section>
+      <section className="panel" style={{ marginBottom: 16, display: "grid", gap: 10, padding: 16 }}>
+        <h3 style={{ margin: 0 }}>Marketplace</h3>
+        <p className="muted" style={{ margin: 0 }}>
+          Partner applications are always available. Turning this on is the flag for later shop dual-mode (platform + partner listings). It does not change checkout yet.
+        </p>
+        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={marketplaceEnabled}
+            onChange={(e) => setMarketplaceEnabled(e.target.checked)}
+          />
+          marketplace.enabled
+        </label>
+        <div>
+          <button type="button" className="primary-button" disabled={saving} onClick={() => void saveMarketplace()}>
+            Save marketplace flag
           </button>
         </div>
       </section>

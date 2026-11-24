@@ -68,6 +68,32 @@ export type User = {
   userType: string;
   roles: string[];
   permissions: string[];
+  partnerNurseryId?: number | null;
+  partnerStatus?: string | null;
+  partnerName?: string | null;
+};
+
+export type PartnerNursery = {
+  id: number;
+  userId: number;
+  businessName: string;
+  ownerName: string;
+  description?: string | null;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  gstin?: string | null;
+  status: string | number;
+  statusName: string;
+  isPlatformOwned: boolean;
+  isActive: boolean;
+  reviewNotes?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
 };
 
 export type AuthResponse = {
@@ -615,8 +641,23 @@ export const PRICING_TYPE: Record<number, string> = {
   4: "Custom quote",
 };
 
+export function isPartnerOnly(user: User | null | undefined): boolean {
+  if (!user) return false;
+  const roles = user.roles ?? [];
+  return roles.includes("PARTNER") && !roles.some((r) => r === "SUPER_ADMIN" || r === "ADMIN");
+}
+
+export function isPlatformStaff(user: User | null | undefined): boolean {
+  if (!user) return false;
+  if (isPartnerOnly(user)) return false;
+  if (user.userType === "AdminStaff") return true;
+  return user.roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
+}
+
+/** Admin console access: platform staff or an approved nursery partner. */
 export function isAdminUser(user: User | null | undefined): boolean {
   if (!user) return false;
+  if (isPartnerOnly(user)) return true;
   if (user.userType === "AdminStaff") return true;
   return user.roles.some((r) => ["SUPER_ADMIN", "ADMIN"].includes(r));
 }
